@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Bar, Radar, Chart } from 'react-chartjs-2';
+import { Bar, Radar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
+import { initializeApp } from "firebase/app";
+// Note: We don't use these functions directly in App.js anymore, but you'd need them in a real app with more features.
+// import { getFirestore } from "firebase/firestore";
+// import { getAuth } from "firebase/auth";
+// import { getFunctions } from "firebase/functions";
+
 
 // Registering Chart.js components
 ChartJS.register(
@@ -16,64 +22,26 @@ ChartJS.register(
   Filler
 );
 
-// --- Firebase Imports (placeholders - replace with real imports in your project) ---
-// In a real project you would run: npm install firebase
-// And then import like this:
-// import { initializeApp } from "firebase/app";
-// import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
-// import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
-// import { getFunctions, httpsCallable } from "firebase/functions";
-
-const initializeApp = (config) => ({ firestore: () => ({}), auth: () => ({}), functions: () => ({}) });
-const getFirestore = (app) => ({});
-const getAuth = (app) => ({});
-const getFunctions = (app) => ({});
-const collection = (db, path) => ({});
-const addDoc = async (colRef, data) => ({ id: 'mock-doc-id' });
-const onSnapshot = (query, callback) => (() => {});
-const httpsCallable = (functions, name) => async (data) => ({ data: {} });
-const signInAnonymously = async (auth) => ({ user: { uid: `anon-${crypto.randomUUID()}` } });
-const onAuthStateChanged = (auth, callback) => (() => {});
-const signInWithCustomToken = async (auth, token) => ({ user: { uid: `custom-${crypto.randomUUID()}` } });
-
-
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
   authDomain: "payroll-skills-platform.firebaseapp.com",
   projectId: "payroll-skills-platform",
-  storageBucket: "payroll-skills-platform.firebasestorage.app",
+  storageBucket: "payroll-skills-platform.appspot.com",
   messagingSenderId: "373583398443",
   appId: "1:373583398443:web:12c57176373976b71ecc6e",
   measurementId: "G-H0PKLLW5PM"
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+initializeApp(firebaseConfig);
 
 
 // --- Main App Component ---
 function App() {
-    // This state manages which view is currently visible to the user.
-    const [view, setView] = useState('login'); // e.g., 'login', 'orgAdminTeamSkills', 'candidateTestInProgress'
-    
-    // This would hold the logged-in user's data in a real app.
-    const [user, setUser] = useState(null); 
+    const [view, setView] = useState('login');
+    const [user, setUser] = useState(null);
 
-    // Global state for any modal pop-ups
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalContent, setModalContent] = useState({ title: '', body: '' });
-    const [isAiLoading, setIsAiLoading] = useState(false);
-
-    // This is a simplified navigation logic. In a real app, you'd use a routing library.
     const navigateTo = (newView, userData = null) => {
         setView(newView);
         if (userData) {
@@ -81,13 +49,10 @@ function App() {
         }
     };
 
-    // This function renders the correct component based on the current 'view' state.
     const renderContent = () => {
         switch (view) {
             case 'login':
                 return <LoginScreen onNavigate={navigateTo} />;
-            
-            // Organisation Admin Views
             case 'orgAdminTeamSkills':
                 return <TeamSkillsDashboard user={user} />;
             case 'orgAdminDashboard':
@@ -96,13 +61,10 @@ function App() {
                 return <TestBuilder user={user} />;
             case 'orgAdminResults':
                 return <CandidateReport user={user} />;
-            
-            // Candidate Views
             case 'candidateDashboard':
                 return <CandidateWelcome user={user} onNavigate={navigateTo} />;
             case 'candidateTestInProgress':
                  return <TestInProgress user={user} onNavigate={navigateTo} />;
-
             default:
                 return <LoginScreen onNavigate={navigateTo} />;
         }
@@ -120,7 +82,6 @@ function App() {
         </div>
     );
 }
-
 
 // --- Main Application Shell (Sidebar + Content) ---
 const Shell = ({ user, children, onNavigate, currentView }) => {
@@ -179,11 +140,8 @@ const Shell = ({ user, children, onNavigate, currentView }) => {
     );
 };
 
-
 // --- Component Views ---
-
 const LoginScreen = ({ onNavigate }) => {
-    // Mock users for demonstration
     const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
     const candidateUser = { name: 'Liam Gallagher', role: 'candidate', company: 'Candidate', avatar: 'https://placehold.co/100x100/60a5fa/1e3a8a?text=L' };
 
@@ -239,7 +197,7 @@ const TeamSkillsDashboard = ({ user }) => {
                 <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700"><h3 className="text-lg font-semibold mb-4">Team Performance</h3><Bar data={teamPerformanceData} options={{ scales: { y: { beginAtZero: true, max: 100, ticks: { callback: value => value + '%' } } }, plugins: { legend: { display: false } } }}/></div>
                 <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700"><h3 className="text-lg font-semibold mb-4">Team Competency Radar</h3><Radar data={teamRadarData} options={{ scales: { r: { beginAtZero: true, max: 100, stepSize: 20 } }, plugins: { legend: { position: 'top' } } }}/></div>
             </div>
-            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700"><h3 className="text-lg font-semibold mb-4">Skills Matrix</h3>{/* ... Skills matrix table ... */}</div>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700"><h3 className="text-lg font-semibold mb-4">Skills Matrix</h3>{/* Skills matrix table would go here */}</div>
         </>
     );
 };
