@@ -3,7 +3,8 @@ import { Bar, Radar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { initializeApp } from "firebase/app";
 import { getFunctions, httpsCallable } from "firebase/functions";
-
+// Add the Auth imports
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Registering Chart.js components
 ChartJS.register(
@@ -11,7 +12,7 @@ ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler
 );
 
-// Your web app's Firebase configuration - This is correctly in place
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
   authDomain: "payroll-skills-platform.firebaseapp.com",
@@ -24,13 +25,39 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// Initialize Firebase Functions
 const functions = getFunctions(app);
+// Initialize Firebase Auth
+const auth = getAuth(app);
+
 
 // --- Main App Component ---
 function App() {
-    const [view, setView] = useState('login');
+    const [view, setView] = useState('loading'); // Start with a loading state
     const [user, setUser] = useState(null);
+
+    // This useEffect hook handles authentication when the app loads
+    useEffect(() => {
+        // Listen for changes in authentication state
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+                // User is signed in.
+                console.log("Firebase user signed in anonymously:", firebaseUser.uid);
+                // Now that we are authenticated, show the login screen
+                setView('login');
+            } else {
+                // User is signed out. Let's sign them in anonymously.
+                console.log("No user, signing in anonymously...");
+                signInAnonymously(auth).catch((error) => {
+                    console.error("Anonymous sign-in error:", error);
+                    // Handle error, maybe show an error screen
+                });
+            }
+        });
+
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
+    }, []); // The empty array ensures this runs only once
+
 
     const navigateTo = (newView, userData = null) => {
         setView(newView);
@@ -38,21 +65,21 @@ function App() {
     };
 
     const renderContent = () => {
+        if (view === 'loading') {
+            return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+        }
+
         switch (view) {
             case 'login': return <LoginScreen onNavigate={navigateTo} />;
             case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} />;
-            case 'orgAdminDashboard': return <CandidateDashboard user={user} onNavigate={navigateTo}/>;
-            case 'orgAdminTestBuilder': return <TestBuilder user={user} />;
-            case 'orgAdminResults': return <CandidateReport user={user} onNavigate={navigateTo} />;
-            case 'candidateDashboard': return <CandidateWelcome user={user} onNavigate={navigateTo} />;
-            case 'candidateTestInProgress': return <TestInProgress user={user} onNavigate={navigateTo} />;
+            // ... other cases
             default: return <LoginScreen onNavigate={navigateTo} />;
         }
     };
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
-            {view === 'login' ? renderContent() : (
+             {view === 'login' || view === 'loading' ? renderContent() : (
                 <Shell user={user} onNavigate={navigateTo} currentView={view}>
                     {renderContent()}
                 </Shell>
@@ -62,18 +89,19 @@ function App() {
 }
 
 // --- Main Application Shell ---
+// NOTE: The Shell component and all other components (LoginScreen, TeamSkillsDashboard, etc.)
+// can remain exactly as they were in the last working version.
+// The code for them is omitted here for brevity, but you should paste them back in
+// from the last version that had the UI displaying correctly.
+
 const Shell = ({ user, children, onNavigate, currentView }) => {
     // ... Shell JSX and logic remains the same ...
     return (
-        // For brevity, the full shell JSX is omitted, but it's the same as before
         <main className="flex-1 overflow-y-auto">
             <div className="p-6 md:p-8">{children}</div>
         </main>
     )
 };
-
-
-// --- Component Views ---
 
 const LoginScreen = ({ onNavigate }) => {
     const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
@@ -99,16 +127,14 @@ const LoginScreen = ({ onNavigate }) => {
     );
 };
 
+
 const TeamSkillsDashboard = ({ user }) => {
-    // This is the new component that handles the AI calls
     return (
         <>
             <header className="mb-8">
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Team Skills Overview</h2>
-                <p className="mt-1 text-slate-500 dark:text-slate-400">An at-a-glance summary of your team's payroll competencies.</p>
             </header>
-            <AITools /> {/* ADDING THE AI TOOLS COMPONENT HERE */}
-            {/* ... rest of the dashboard JSX ... */}
+            <AITools />
         </>
     );
 };
@@ -122,18 +148,18 @@ const AITools = () => {
         setLoading(true);
         setResult("");
         try {
-            // This is the new part: calling our Cloud Function
             const callGeminiFunction = httpsCallable(functions, 'callGemini');
             const prompt = `You are an expert in UK Payroll regulations. Create one new multiple-choice quiz question based on the topic: "${topic}". Provide 4 options, one of which must be correct. Also provide a brief explanation.`;
             
             const response = await callGeminiFunction({ prompt });
-            // The actual content is nested in the response data
+            
+            // Note the structure may vary slightly, adjust if necessary
             const text = response.data.candidates[0].content.parts[0].text;
             setResult(text);
 
         } catch (error) {
             console.error("Error calling Cloud Function:", error);
-            setResult("An error occurred. Please check the console.");
+            setResult(`An error occurred: ${error.message}`);
         }
         setLoading(false);
     };
@@ -166,14 +192,11 @@ const AITools = () => {
     );
 };
 
-
-// --- All other components (CandidateDashboard, TestBuilder, etc.) would be here ---
-// For brevity, they are omitted but would be needed in the full file.
+// --- Dummy components to make the file complete ---
 const CandidateDashboard = () => <div>Candidate Dashboard</div>;
 const TestBuilder = () => <div>Test Builder</div>;
 const CandidateReport = () => <div>Candidate Report</div>;
 const CandidateWelcome = ({onNavigate, user}) => <button onClick={() => onNavigate('candidateTestInProgress', user)}>Begin Test</button>;
 const TestInProgress = () => <div>Test In Progress</div>;
-
 
 export default App;
