@@ -15,8 +15,10 @@ export const callGemini = functions.https.onCall(async (data, context) => {
   }
 
   const prompt = data.prompt;
+  
+  // THIS IS THE CORRECTED LINE
   const apiUrl =
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
 
   const payload = {
     contents: [{parts: [{text: prompt}]}],
