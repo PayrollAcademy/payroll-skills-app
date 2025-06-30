@@ -34,7 +34,7 @@ function App() {
     const [view, setView] = useState('loading');
     const [user, setUser] = useState(null);
     const [appId] = useState('payroll-skills-app-v1');
-    const [contextData, setContextData] = useState({}); // For passing data like result or testId
+    const [contextData, setContextData] = useState({});
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -139,11 +139,230 @@ const LoginScreen = ({ onNavigate }) => {
     );
 };
 
-const TeamSkillsDashboard = ({ db, appId }) => { /* ... same as before ... */ return <div>Team Skills Dashboard</div>; };
+const TeamSkillsDashboard = ({ db, appId }) => {
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-const CandidateDashboard = ({ user, db, appId, onNavigate }) => { /* ... same as before ... */ return <div>Candidate Dashboard</div>; };
+    useEffect(() => {
+        const q = query(collection(db, `/artifacts/${appId}/public/data/results`));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [db, appId]);
 
-const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => { /* ... same as before ... */ return <div>Report and Feedback</div>; };
+    const teamStats = useMemo(() => {
+        if (results.length === 0) return { averageScore: 0, testCount: 0 };
+        const totalScore = results.reduce((sum, r) => sum + r.percentage, 0);
+        return { averageScore: Math.round(totalScore / results.length), testCount: results.length };
+    }, [results]);
+
+    const teamPerformanceData = {
+        labels: results.map(r => r.userName),
+        datasets: [{
+            label: 'Overall Score', data: results.map(r => r.percentage),
+            backgroundColor: results.map(r => r.percentage >= 80 ? '#10b981' : r.percentage >= 60 ? '#f59e0b' : '#ef4444'),
+        }]
+    };
+
+    if (loading) return <div>Loading dashboard...</div>;
+
+    return (
+        <>
+            <header className="mb-8"><h2 className="text-3xl font-bold">Team Skills Overview</h2><p className="mt-1 text-slate-500">An at-a-glance summary of your team's payroll competencies.</p></header>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Team Average Score</p><p className="text-4xl font-bold mt-2 text-sky-600">{teamStats.averageScore}%</p></div>
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Tests Completed</p><p className="text-4xl font-bold mt-2 text-emerald-600">{teamStats.testCount}</p></div>
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Area for Development</p><p className="text-4xl font-bold mt-2 text-amber-600">Statutory Pay</p></div>
+            </div>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">Team Performance</h3>
+                {results.length > 0 ? <Bar data={teamPerformanceData} options={{ scales: { y: { beginAtZero: true, max: 100, ticks: { callback: value => value + '%' } } }, plugins: { legend: { display: false } } }}/> : <p>No results yet.</p>}
+            </div>
+        </>
+    );
+};
+
+const CandidateDashboard = ({ user, db, appId, onNavigate }) => {
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(collection(db, `/artifacts/${appId}/public/data/results`));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [db, appId]);
+
+    if (loading) return <div>Loading candidates...</div>;
+
+    return (
+        <>
+            <header className="mb-8"><h2 className="text-3xl font-bold">Candidate Results</h2><p className="mt-1 text-slate-500">Review and share test results.</p></header>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">All Results</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="border-b border-slate-200 dark:border-slate-600 text-sm text-slate-500">
+                            <tr><th className="py-2 px-4">Candidate</th><th className="py-2 px-4">Score</th><th className="py-2 px-4">Status</th><th className="py-2 px-4"></th></tr>
+                        </thead>
+                        <tbody>
+                            {results.length > 0 ? results.map(r => (
+                                <tr key={r.id} className="border-b border-slate-200 dark:border-slate-700">
+                                    <td className="py-3 px-4 font-medium">{r.userName}</td>
+                                    <td className="py-3 px-4">{r.percentage}%</td>
+                                    <td className="py-3 px-4">{r.isShared ? <span className="text-emerald-500 font-semibold">Shared</span> : <span className="text-slate-500">Not Shared</span>}</td>
+                                    <td className="py-3 px-4 text-right">
+                                        <button onClick={() => onNavigate('orgAdminReportDetail', { user, result: r })} className="text-sky-600 hover:underline text-sm font-semibold">View Report</button>
+                                    </td>
+                                </tr>
+                            )) : <tr><td colSpan="4" className="text-center py-4">No results have been submitted yet.</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
+    );
+};
+
+const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
+    const [questions, setQuestions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [aiFeedback, setAiFeedback] = useState(result.aiFeedback || '');
+    const [managerFeedback, setManagerFeedback] = useState(result.managerFeedback || '');
+    const [isShared, setIsShared] = useState(result.isShared || false);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    
+    const isManagerView = user.role === 'orgAdmin';
+
+    useEffect(() => {
+        const fetchQuestions = async () => {
+            const questionsCol = collection(db, `/artifacts/${appId}/public/data/question_bank`);
+            const questionSnapshot = await getDocs(questionsCol);
+            setQuestions(questionSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        };
+        fetchQuestions();
+    }, [db, appId]);
+
+    const generateAiFeedback = async () => {
+        setIsAiLoading(true);
+        try {
+            const callGeminiFunction = httpsCallable(functions, 'callGemini');
+            const prompt = `Analyze the following UK payroll test result for a candidate named ${result.userName} who scored ${result.percentage}%. Their topic scores were: ${JSON.stringify(result.topicScores)}. Generate a concise, professional performance summary (2 paragraphs). Highlight strengths and identify key knowledge gaps based on their scores.`;
+            const response = await callGeminiFunction({ prompt });
+            const feedbackText = response.data.candidates[0].content.parts[0].text;
+            setAiFeedback(feedbackText);
+            const resultRef = doc(db, `/artifacts/${appId}/public/data/results`, result.id);
+            await updateDoc(resultRef, { aiFeedback: feedbackText });
+        } catch (error) {
+            console.error("Error generating AI feedback:", error);
+        }
+        setIsAiLoading(false);
+    };
+    
+    const handleSaveChanges = async () => {
+        const resultRef = doc(db, `/artifacts/${appId}/public/data/results`, result.id);
+        try {
+            await updateDoc(resultRef, { managerFeedback, isShared });
+            onNavigate('orgAdminDashboard', { user });
+        } catch (error) {
+            console.error("Error saving changes:", error);
+        }
+    };
+    
+    const getTrafficLightColor = (score) => {
+        if (score >= 80) return 'bg-emerald-500';
+        if (score >= 50) return 'bg-amber-500';
+        return 'bg-red-500';
+    };
+
+    if (loading) return <div>Loading report...</div>;
+
+    return (
+        <>
+            <header className="mb-8">
+                <h2 className="text-3xl font-bold">Report for: {result.userName}</h2>
+                <p className="mt-1 text-slate-500">Score: {result.percentage}% ({result.score}/{result.totalQuestions})</p>
+            </header>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                    {isManagerView && (
+                        <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-semibold">✨ AI Generated Feedback</h3><button onClick={generateAiFeedback} disabled={isAiLoading} className="text-sm bg-sky-100 text-sky-700 font-semibold py-1 px-3 rounded-lg hover:bg-sky-200 disabled:bg-slate-200">{isAiLoading ? 'Generating...' : 'Generate / Regenerate'}</button></div>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{aiFeedback || "Click 'Generate' to get an AI summary."}</p>
+                        </div>
+                    )}
+                    {aiFeedback && !isManagerView && (
+                         <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <h3 className="text-lg font-semibold mb-2">✨ AI Generated Feedback</h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{aiFeedback}</p>
+                        </div>
+                    )}
+                    <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <h3 className="text-lg font-semibold mb-2">Manager's Feedback</h3>
+                        {isManagerView ? (
+                            <textarea value={managerFeedback} onChange={(e) => setManagerFeedback(e.target.value)} rows="5" className="w-full p-2 border rounded-md bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600" placeholder="Add your personal comments..."></textarea>
+                        ) : (
+                            <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{managerFeedback || "No feedback provided by manager."}</p>
+                        )}
+                    </div>
+                    <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                         <h3 className="text-lg font-semibold mb-4">Answer Review</h3>
+                        <div className="space-y-4">
+                            {result.answers.map((ans, index) => {
+                                const question = questions.find(q => q.id === ans.questionId);
+                                if (!question) return null;
+                                const isCorrect = ans.answer === question.answer;
+                                return (
+                                    <div key={index} className="pb-4 border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+                                        <h4 className="font-semibold text-sm mb-2">{index + 1}. {question.text}</h4>
+                                        <div className={`p-2 rounded-md text-sm ${isCorrect ? 'bg-emerald-50 dark:bg-emerald-900/50' : 'bg-red-50 dark:bg-red-900/50'}`}>
+                                            <span className="font-bold">Your answer: </span>{ans.answer}
+                                            {isCorrect ? <span className="font-bold text-emerald-600"> (Correct)</span> : <span className="font-bold text-red-600"> (Incorrect)</span>}
+                                        </div>
+                                        {!isCorrect && <div className="mt-1 p-2 rounded-md text-sm bg-slate-100 dark:bg-slate-700"><span className="font-bold">Correct answer: </span>{question.answer}</div>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+                <div className="lg:col-span-1 space-y-6">
+                    <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <h3 className="text-lg font-semibold mb-4">Skills Summary</h3>
+                        <div className="space-y-3">
+                            {result.topicScores && Object.entries(result.topicScores).map(([topic, score]) => (
+                                <div key={topic}>
+                                    <div className="flex justify-between items-center mb-1 text-sm"><span className="font-medium">{topic}</span><span>{score}%</span></div>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                                        <div className={`${getTrafficLightColor(score)} h-2.5 rounded-full`} style={{ width: `${score}%` }}></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {isManagerView && (
+                         <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <h3 className="text-lg font-semibold mb-2">Sharing</h3>
+                            <div className="flex items-center justify-between"><p className="text-sm">Share results with candidate?</p><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={isShared} onChange={() => setIsShared(!isShared)} className="sr-only peer"/><div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-sky-600"></div></label></div>
+                        </div>
+                    )}
+                </div>
+            </div>
+            {isManagerView && (
+                <div className="mt-8 flex justify-end gap-4">
+                    <button onClick={() => onNavigate('orgAdminDashboard', {user})} className="bg-slate-200 text-slate-800 font-semibold py-2 px-6 rounded-lg hover:bg-slate-300">Cancel</button>
+                    <button onClick={handleSaveChanges} className="bg-emerald-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-emerald-700">Save and Finish Review</button>
+                </div>
+            )}
+        </>
+    );
+};
+
 
 const QuestionBank = ({ db, appId }) => {
     const [questions, setQuestions] = useState([]);
@@ -350,7 +569,6 @@ const TestInProgress = ({ user, testId, db, appId, onNavigate }) => {
     useEffect(() => {
         const fetchTest = async () => {
             if (!testId) return;
-            const testRef = doc(db, `/artifacts/${appId}/public/data/tests`, testId);
             const testSnap = await getDocs(query(collection(db, `/artifacts/${appId}/public/data/tests`), where("__name__", "==", testId)));
             
             if (!testSnap.empty) {
@@ -368,8 +586,52 @@ const TestInProgress = ({ user, testId, db, appId, onNavigate }) => {
         fetchTest();
     }, [db, appId, testId]);
 
-    const handleFinishTest = async () => { /* ... same as before ... */ };
-    const handleNextQuestion = () => { /* ... same as before ... */ };
+    const handleFinishTest = async () => {
+        const finalAnswers = [...submittedAnswers, { questionId: questions[currentQuestionIndex].id, answer: selectedAnswer }];
+        
+        let score = 0;
+        finalAnswers.forEach(ans => {
+            const question = questions.find(q => q.id === ans.questionId);
+            if (question && question.answer === ans.answer) score++;
+        });
+
+        const topicScores = {};
+        const topicCounts = {};
+        finalAnswers.forEach(ans => {
+            const question = questions.find(q => q.id === ans.questionId);
+            if (question) {
+                const topic = question.topic || 'General';
+                if (!topicScores[topic]) { topicScores[topic] = 0; topicCounts[topic] = 0; }
+                topicCounts[topic]++;
+                if (question.answer === ans.answer) topicScores[topic]++;
+            }
+        });
+
+        const finalTopicScores = {};
+        for (const topic in topicScores) {
+            finalTopicScores[topic] = Math.round((topicScores[topic] / topicCounts[topic]) * 100);
+        }
+
+        const resultData = {
+            userId: auth.currentUser.uid, userName: user.name, score, totalQuestions: questions.length,
+            percentage: Math.round((score / questions.length) * 100), answers: finalAnswers, timestamp: new Date().toISOString(),
+            topicScores: finalTopicScores, isShared: false,
+        };
+
+        try {
+            const resultId = `${user.name.replace(/\s+/g, '-')}-${Date.now()}`;
+            await setDoc(doc(db, `/artifacts/${appId}/public/data/results`, resultId), resultData);
+            onNavigate('testFinished', { user });
+        } catch (error) {
+            console.error("Error saving test results: ", error);
+        }
+    };
+    
+    const handleNextQuestion = () => {
+        setSubmittedAnswers([...submittedAnswers, { questionId: questions[currentQuestionIndex].id, answer: selectedAnswer }]);
+        setSelectedAnswer(null);
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+    };
 
     if (loading) return <div className="text-center">Loading Test...</div>;
     if (!test || questions.length === 0) return <div className="text-center">Could not load test questions.</div>;
