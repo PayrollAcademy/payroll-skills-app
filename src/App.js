@@ -122,7 +122,7 @@ const Shell = ({ user, children, onNavigate, currentView }) => {
 
 const LoginScreen = ({ onNavigate }) => {
     const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
-    const candidateUser = { name: 'Liam Gallagher', role: 'candidate', company: 'Candidate', avatar: 'https://placehold.co/100x100/60a5fa/1e3a8a?text=L', uid: 'candidate_liam_gallagher' };
+    const candidateUser = { name: 'Liam Gallagher', role: 'candidate', company: 'Candidate', avatar: 'https://placehold.co/100x100/60a5fa/1e3a8a?text=L' };
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900">
@@ -288,7 +288,6 @@ const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
             </header>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Feedback Section */}
                     {isManagerView && (
                         <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                             <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-semibold">✨ AI Generated Feedback</h3><button onClick={generateAiFeedback} disabled={isAiLoading} className="text-sm bg-sky-100 text-sky-700 font-semibold py-1 px-3 rounded-lg hover:bg-sky-200 disabled:bg-slate-200">{isAiLoading ? 'Generating...' : 'Generate / Regenerate'}</button></div>
@@ -309,7 +308,6 @@ const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
                             <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{managerFeedback || "No feedback provided by manager."}</p>
                         )}
                     </div>
-                     {/* Question Breakdown */}
                     <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                          <h3 className="text-lg font-semibold mb-4">Answer Review</h3>
                         <div className="space-y-4">
@@ -332,7 +330,6 @@ const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
                     </div>
                 </div>
                 <div className="lg:col-span-1 space-y-6">
-                    {/* Skills Summary */}
                     <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                         <h3 className="text-lg font-semibold mb-4">Skills Summary</h3>
                         <div className="space-y-3">
@@ -346,7 +343,6 @@ const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
                             ))}
                         </div>
                     </div>
-                     {/* Sharing Controls */}
                     {isManagerView && (
                          <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                             <h3 className="text-lg font-semibold mb-2">Sharing</h3>
@@ -384,8 +380,37 @@ const QuestionBank = ({ db, appId }) => {
         return () => unsubscribe();
     }, [db, appId]);
 
-    const handleInputChange = (e, index) => { /* ... same as before ... */ };
-    const handleAddQuestion = async (e) => { /* ... same as before ... */ };
+    const handleInputChange = (e, index) => {
+        const { name, value } = e.target;
+        if (name === 'option') {
+            const updatedOptions = [...newQuestion.options];
+            updatedOptions[index] = value;
+            setNewQuestion({ ...newQuestion, options: updatedOptions });
+        } else {
+            setNewQuestion({ ...newQuestion, [name]: value });
+        }
+    };
+
+    const handleAddQuestion = async (e) => {
+        e.preventDefault();
+        setError(''); setSuccess('');
+        if (!newQuestion.text || newQuestion.options.some(opt => !opt) || !newQuestion.answer) {
+            setError("Please fill out all fields."); return;
+        }
+        if (!newQuestion.options.includes(newQuestion.answer)) {
+            setError("The correct answer must be one of the four options provided."); return;
+        }
+        try {
+            await addDoc(collection(db, `/artifacts/${appId}/public/data/question_bank`), {
+                text: newQuestion.text, options: newQuestion.options, answer: newQuestion.answer, topic: newQuestion.topic
+            });
+            setNewQuestion({ text: '', options: ['', '', '', ''], answer: '', topic: 'General' });
+            setSuccess('Question added successfully!');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            setError("Could not save the question.");
+        }
+    };
 
     return (
         <>
@@ -393,28 +418,67 @@ const QuestionBank = ({ db, appId }) => {
             <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-semibold mb-4">Add New Question</h3>
                 <form onSubmit={handleAddQuestion} className="space-y-4">
-                    <div><label>Question Text</label><input name="text" value={newQuestion.text} onChange={handleInputChange} required /></div>
+                    <div><label>Question Text</label><input type="text" name="text" value={newQuestion.text} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" /></div>
                     <div>
                         <label>Topic</label>
-                        <select name="topic" value={newQuestion.topic} onChange={handleInputChange}>
+                        <select name="topic" value={newQuestion.topic} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md">
                             {topics.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
                     {newQuestion.options.map((opt, index) => (
-                        <div key={index}><label>Option {index + 1}</label><input name="option" value={opt} onChange={(e) => handleInputChange(e, index)} required /></div>
+                        <div key={index}><label>Option {index + 1}</label><input type="text" name="option" value={opt} onChange={(e) => handleInputChange(e, index)} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" /></div>
                     ))}
-                    <div><label>Correct Answer</label><input name="answer" value={newQuestion.answer} onChange={handleInputChange} required /></div>
-                    <button type="submit">Add Question</button>
+                    <div><label>Correct Answer</label><input type="text" name="answer" value={newQuestion.answer} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" /></div>
+                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {success && <p className="text-sm text-emerald-500">{success}</p>}
+                    <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Add Question</button>
                 </form>
             </div>
-            {/* ... existing questions list ... */}
         </>
     );
 };
 
 const CandidateWelcome = ({ user, db, appId, onNavigate }) => {
-    // ... same as before ...
-    return <div>Candidate Welcome</div>;
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(collection(db, `/artifacts/${appId}/public/data/results`));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const resultsData = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(r => r.userName === user.name && r.isShared);
+            setResults(resultsData);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [db, appId, user.name]);
+
+    return (
+        <>
+            <header className="mb-8"><h2 className="text-3xl font-bold">Welcome, {user.name.split(' ')[0]}!</h2></header>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700 mb-8">
+                <h3 className="text-lg font-semibold mb-4">New Tests</h3>
+                <div className="p-4 bg-sky-50 dark:bg-sky-900/50 rounded-lg flex justify-between items-center">
+                    <div><p className="font-semibold">Payroll Skills Assessment</p><p className="text-sm text-slate-500">Assigned by ABC Corp</p></div>
+                    <button onClick={() => onNavigate('candidateTestInProgress', { user })} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Begin Test</button>
+                </div>
+            </div>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">My Results</h3>
+                {loading ? <p>Loading results...</p> : (
+                    <div className="space-y-3">
+                        {results.length > 0 ? results.map(r => (
+                            <div key={r.id} className="p-4 border rounded-lg flex justify-between items-center">
+                                <div><p className="font-semibold">Completed on {new Date(r.timestamp).toLocaleDateString()}</p><p className="text-sm text-slate-500">Score: {r.percentage}%</p></div>
+                                <button onClick={() => onNavigate('orgAdminReportDetail', { user, result: r })} className="text-sky-600 hover:underline text-sm font-semibold">View Details</button>
+                            </div>
+                        )) : <p className="text-sm text-slate-500">You have no shared results yet.</p>}
+                    </div>
+                )}
+            </div>
+        </>
+    );
 };
 
 const TestInProgress = ({ user, db, appId, onNavigate }) => {
@@ -437,28 +501,21 @@ const TestInProgress = ({ user, db, appId, onNavigate }) => {
     const handleFinishTest = async () => {
         const finalAnswers = [...submittedAnswers, { questionId: questions[currentQuestionIndex].id, answer: selectedAnswer }];
         
-        // Calculate overall score
         let score = 0;
         finalAnswers.forEach(ans => {
             const question = questions.find(q => q.id === ans.questionId);
             if (question && question.answer === ans.answer) score++;
         });
 
-        // Calculate score per topic
         const topicScores = {};
         const topicCounts = {};
         finalAnswers.forEach(ans => {
             const question = questions.find(q => q.id === ans.questionId);
             if (question) {
                 const topic = question.topic || 'General';
-                if (!topicScores[topic]) {
-                    topicScores[topic] = 0;
-                    topicCounts[topic] = 0;
-                }
+                if (!topicScores[topic]) { topicScores[topic] = 0; topicCounts[topic] = 0; }
                 topicCounts[topic]++;
-                if (question.answer === ans.answer) {
-                    topicScores[topic]++;
-                }
+                if (question.answer === ans.answer) topicScores[topic]++;
             }
         });
 
