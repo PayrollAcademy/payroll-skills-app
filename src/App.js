@@ -76,8 +76,27 @@ const Shell = ({ user, children, onNavigate, currentView }) => {
 // --- Component Views ---
 
 const LoginScreen = ({ onNavigate }) => {
-    // ... LoginScreen JSX remains the same ...
-    return <div>Login Screen Content</div>;
+    const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
+    const candidateUser = { name: 'Liam Gallagher', role: 'candidate', company: 'Candidate', avatar: 'https://placehold.co/100x100/60a5fa/1e3a8a?text=L' };
+
+    return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900">
+            <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg">
+                <div className="text-center">
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Payroll Skills Platform</h1>
+                    <p className="mt-2 text-slate-500 dark:text-slate-400">Welcome back! Please sign in.</p>
+                </div>
+                <div className="space-y-6">
+                    <button onClick={() => onNavigate('orgAdminTeamSkills', orgAdminUser)} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                        Sign in as Payroll Manager
+                    </button>
+                     <button onClick={() => onNavigate('candidateDashboard', candidateUser)} className="w-full flex justify-center py-3 px-4 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500">
+                        Sign in as Candidate
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const TeamSkillsDashboard = ({ user }) => {
