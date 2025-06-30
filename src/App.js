@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Bar, Radar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { initializeApp } from "firebase/app";
@@ -25,7 +25,6 @@ const firebaseConfig = {
 
 // Initialize Firebase services
 const app = initializeApp(firebaseConfig);
-const functions = getFunctions(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -33,7 +32,7 @@ const db = getFirestore(app);
 function App() {
     const [view, setView] = useState('loading');
     const [user, setUser] = useState(null);
-    const [appId] = useState('payroll-skills-app-v1'); // App ID for Firestore paths
+    const [appId] = useState('payroll-skills-app-v1');
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -60,8 +59,8 @@ function App() {
 
         switch (view) {
             case 'login': return <LoginScreen onNavigate={navigateTo} />;
-            case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} />;
-            case 'orgAdminDashboard': return <CandidateDashboard user={user} onNavigate={navigateTo}/>;
+            case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} db={db} appId={appId} />;
+            case 'orgAdminDashboard': return <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo}/>;
             case 'orgAdminQuestionBank': return <QuestionBank user={user} db={db} appId={appId} />;
             case 'candidateDashboard': return <CandidateWelcome user={user} onNavigate={navigateTo} />;
             case 'candidateTestInProgress': return <TestInProgress user={user} db={db} appId={appId} onNavigate={navigateTo} />;
@@ -153,8 +152,101 @@ const LoginScreen = ({ onNavigate }) => {
     );
 };
 
-const TeamSkillsDashboard = () => <div>Team Skills Dashboard</div>;
-const CandidateDashboard = () => <div>Candidate Management Dashboard</div>;
+const TeamSkillsDashboard = ({ db, appId }) => {
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(collection(db, `/artifacts/${appId}/public/data/results`));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const resultsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setResults(resultsData);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [db, appId]);
+
+    const teamStats = useMemo(() => {
+        if (results.length === 0) return { averageScore: 0, testCount: 0 };
+        const totalScore = results.reduce((sum, r) => sum + r.percentage, 0);
+        return {
+            averageScore: Math.round(totalScore / results.length),
+            testCount: results.length,
+        };
+    }, [results]);
+
+    const teamPerformanceData = {
+        labels: results.map(r => r.userName),
+        datasets: [{
+            label: 'Overall Score',
+            data: results.map(r => r.percentage),
+            backgroundColor: results.map(r => r.percentage >= 80 ? '#10b981' : r.percentage >= 60 ? '#f59e0b' : '#ef4444'),
+        }]
+    };
+
+    if (loading) return <div>Loading dashboard...</div>;
+
+    return (
+        <>
+            <header className="mb-8">
+                <h2 className="text-3xl font-bold">Team Skills Overview</h2>
+                <p className="mt-1 text-slate-500">An at-a-glance summary of your team's payroll competencies.</p>
+            </header>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Team Average Score</p><p className="text-4xl font-bold mt-2 text-sky-600">{teamStats.averageScore}%</p></div>
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Tests Completed</p><p className="text-4xl font-bold mt-2 text-emerald-600">{teamStats.testCount}</p></div>
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Area for Development</p><p className="text-4xl font-bold mt-2 text-amber-600">Statutory Pay</p></div>
+            </div>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">Team Performance</h3>
+                {results.length > 0 ? <Bar data={teamPerformanceData} options={{ scales: { y: { beginAtZero: true, max: 100, ticks: { callback: value => value + '%' } } }, plugins: { legend: { display: false } } }}/> : <p>No results yet.</p>}
+            </div>
+        </>
+    );
+};
+
+const CandidateDashboard = ({ db, appId }) => {
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(collection(db, `/artifacts/${appId}/public/data/results`));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const resultsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setResults(resultsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [db, appId]);
+
+    if (loading) return <div>Loading candidates...</div>;
+
+    return (
+        <>
+            <header className="mb-8"><h2 className="text-3xl font-bold">Candidate Results</h2><p className="mt-1 text-slate-500">Review completed test results.</p></header>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">All Results</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="border-b border-slate-200 dark:border-slate-600 text-sm text-slate-500">
+                            <tr><th className="py-2 px-4">Candidate</th><th className="py-2 px-4">Score</th><th className="py-2 px-4">Date</th></tr>
+                        </thead>
+                        <tbody>
+                            {results.length > 0 ? results.map(r => (
+                                <tr key={r.id} className="border-b border-slate-200 dark:border-slate-700">
+                                    <td className="py-3 px-4 font-medium">{r.userName}</td>
+                                    <td className="py-3 px-4">{r.percentage}% ({r.score}/{r.totalQuestions})</td>
+                                    <td className="py-3 px-4 text-sm text-slate-500">{new Date(r.timestamp).toLocaleDateString()}</td>
+                                </tr>
+                            )) : <tr><td colSpan="3" className="text-center py-4">No results have been submitted yet.</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
+    );
+};
+
 
 const QuestionBank = ({ db, appId }) => {
     const [questions, setQuestions] = useState([]);
