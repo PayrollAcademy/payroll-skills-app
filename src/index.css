@@ -3,19 +3,22 @@
 @tailwind utilities;
 
 @layer components {
+  .sidebar-link {
+    @apply flex items-center p-3 rounded-lg transition-colors font-medium text-slate-600 dark:text-slate-300;
+  }
+  .sidebar-link.active, .sidebar-link:hover {
+    @apply bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-200;
+  }
+  .kpi-card {
+    @apply bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700 transition-all hover:shadow-lg hover:-translate-y-1;
+  }
   .answer-option {
     @apply block w-full text-left py-3 px-4 rounded-md border border-slate-300 bg-white hover:bg-sky-50 dark:border-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors;
   }
   .answer-option.selected {
     @apply ring-2 ring-sky-500 border-sky-500 bg-sky-100 dark:bg-sky-900;
   }
-  .kpi-card {
-      @apply bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700 transition-all hover:shadow-lg hover:-translate-y-1;
-  }
-  .sidebar-link {
-      @apply flex items-center p-3 rounded-lg transition-colors font-medium text-slate-600 dark:text-slate-300;
-  }
-  .sidebar-link.active, .sidebar-link:hover {
-      @apply bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-200;
+  .skill-cell {
+    @apply p-2 text-center font-bold text-white;
   }
 }
