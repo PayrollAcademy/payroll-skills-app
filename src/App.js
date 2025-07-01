@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bar, Radar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where } from "firebase/firestore";
+import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
@@ -481,18 +480,29 @@ const QuestionBank = ({ db, appId }) => {
 
 const TestBuilder = ({ user, db, appId, onNavigate }) => {
     const [allQuestions, setAllQuestions] = useState([]);
+    const [tests, setTests] = useState([]);
     const [testName, setTestName] = useState('');
     const [selectedQuestions, setSelectedQuestions] = useState([]);
+    const [editingTest, setEditingTest] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     useEffect(() => {
-        const q = query(collection(db, `/artifacts/${appId}/public/data/question_bank`));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const qBankQuery = query(collection(db, `/artifacts/${appId}/public/data/question_bank`));
+        const testsQuery = query(collection(db, `/artifacts/${appId}/public/data/tests`));
+
+        const unsubQuestions = onSnapshot(qBankQuery, (snapshot) => {
             setAllQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            setLoading(false);
         });
-        return () => unsubscribe();
+        const unsubTests = onSnapshot(testsQuery, (snapshot) => {
+            setTests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        setLoading(false);
+        return () => {
+            unsubQuestions();
+            unsubTests();
+        };
     }, [db, appId]);
 
     const handleAddQuestionToTest = (question) => {
@@ -517,18 +527,38 @@ const TestBuilder = ({ user, db, appId, onNavigate }) => {
             createdAt: new Date().toISOString(),
         };
         try {
-            await addDoc(collection(db, `/artifacts/${appId}/public/data/tests`), testData);
-            onNavigate('orgAdminDashboard', { user });
+            if (editingTest) {
+                const testRef = doc(db, `/artifacts/${appId}/public/data/tests`, editingTest.id);
+                await updateDoc(testRef, testData);
+            } else {
+                await addDoc(collection(db, `/artifacts/${appId}/public/data/tests`), testData);
+            }
+            setTestName('');
+            setSelectedQuestions([]);
+            setEditingTest(null);
         } catch (err) {
             setError('Could not save the test.');
         }
     };
 
-    if (loading) return <div>Loading questions...</div>;
+    const handleEditTest = (test) => {
+        setEditingTest(test);
+        setTestName(test.name);
+        const questionsForTest = allQuestions.filter(q => test.questionIds.includes(q.id));
+        setSelectedQuestions(questionsForTest);
+    };
+
+    const handleDeleteTest = async (testId) => {
+        if (window.confirm("Are you sure you want to delete this test?")) {
+            await deleteDoc(doc(db, `/artifacts/${appId}/public/data/tests`, testId));
+        }
+    };
+
+    if (loading) return <div>Loading...</div>;
 
     return (
         <>
-            <header className="mb-8"><h2 className="text-3xl font-bold">Test Builder</h2><p className="mt-1 text-slate-500">Create a new assessment by selecting questions from your bank.</p></header>
+            <header className="mb-8"><h2 className="text-3xl font-bold">Test Builder</h2><p className="mt-1 text-slate-500">Create and manage assessments.</p></header>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-semibold mb-4">Available Questions</h3>
@@ -542,18 +572,35 @@ const TestBuilder = ({ user, db, appId, onNavigate }) => {
                     </div>
                 </div>
                 <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <h3 className="text-lg font-semibold mb-4">New Test</h3>
-                    <input type="text" value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Test Name (e.g., Graduate Intake 2025)" className="mb-4 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" />
+                    <h3 className="text-lg font-semibold mb-4">{editingTest ? 'Edit Test' : 'New Test'}</h3>
+                    <input type="text" value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Test Name" className="mb-4 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" />
                     <div className="space-y-2 mb-4">
                         {selectedQuestions.length > 0 ? selectedQuestions.map(q => (
                              <div key={q.id} className="p-2 bg-sky-50 dark:bg-sky-900/50 rounded-md flex justify-between items-center">
                                 <span className="text-sm">{q.text}</span>
                                 <button onClick={() => handleRemoveQuestionFromTest(q.id)} className="text-red-500 text-sm font-semibold hover:underline flex-shrink-0 ml-4">Remove</button>
                             </div>
-                        )) : <p className="text-sm text-slate-400">Select questions from the left to add them to this test.</p>}
+                        )) : <p className="text-sm text-slate-400">Select questions to add them here.</p>}
                     </div>
                     {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
-                    <button onClick={handleSaveTest} className="w-full bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-emerald-700">Save Test</button>
+                    <div className="flex items-center gap-4">
+                        <button onClick={handleSaveTest} className="w-full bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-emerald-700">{editingTest ? 'Update Test' : 'Save Test'}</button>
+                        {editingTest && <button onClick={() => { setEditingTest(null); setTestName(''); setSelectedQuestions([]); }} className="text-sm text-slate-500 hover:underline">Cancel</button>}
+                    </div>
+                </div>
+            </div>
+            <div className="mt-8 bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">Existing Tests</h3>
+                <div className="space-y-2">
+                    {tests.map(t => (
+                        <div key={t.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md flex justify-between items-center">
+                            <span className="font-semibold">{t.name}</span>
+                            <div className="flex gap-4">
+                                <button onClick={() => handleEditTest(t)} className="text-sm text-sky-600 hover:underline font-semibold">Edit</button>
+                                <button onClick={() => handleDeleteTest(t.id)} className="text-sm text-red-500 hover:underline font-semibold">Delete</button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </>
