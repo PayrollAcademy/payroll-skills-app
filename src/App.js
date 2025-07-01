@@ -12,6 +12,7 @@ ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler
 );
 
+
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
