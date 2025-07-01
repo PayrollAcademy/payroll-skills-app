@@ -12,7 +12,6 @@ ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler
 );
 
-
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
@@ -188,7 +187,7 @@ const TeamSkillsDashboard = ({ db, appId }) => {
     }, [db, appId]);
 
     const teamStats = useMemo(() => {
-        if (results.length === 0) return { averageScore: 0, testCount: 0, topSkill: 'N/A', topics: {} };
+        if (results.length === 0) return { averageScore: 0, testCount: 0, topSkill: 'N/A', avgTopicScores: {} };
         
         const totalScore = results.reduce((sum, r) => sum + r.percentage, 0);
         
@@ -273,7 +272,7 @@ const TeamSkillsDashboard = ({ db, appId }) => {
                 </div>
                 <div className="lg:col-span-2 bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-semibold mb-4">Team Competency Radar</h3>
-                    {Object.keys(teamStats.avgTopicScores).length > 0 ? <Radar data={teamRadarData} options={{ scales: { r: { beginAtZero: true, max: 100, stepSize: 20 } }, plugins: { legend: { position: 'top' } } }}/> : <p>No data for radar.</p>}
+                    {Object.keys(teamStats.avgTopicScores).length > 2 ? <Radar data={teamRadarData} options={{ scales: { r: { beginAtZero: true, max: 100, stepSize: 20 } }, plugins: { legend: { position: 'top' } } }}/> : <p className="text-sm text-slate-500">Need at least 3 topics with results to display radar chart.</p>}
                 </div>
             </div>
         </>
