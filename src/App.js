@@ -59,6 +59,7 @@ function App() {
 
         switch (view) {
             case 'login': return <LoginScreen onNavigate={navigateTo} />;
+            case 'platformAdminDashboard': return <PlatformAdminDashboard />;
             case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} db={db} appId={appId} />;
             case 'orgAdminDashboard': return <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminQuestionBank': return <QuestionBank user={user} db={db} appId={appId} />;
@@ -85,6 +86,9 @@ function App() {
 // --- Main Application Shell ---
 const Shell = ({ user, children, onNavigate, currentView }) => {
     const navs = {
+        platformAdmin: [
+            { id: 'platformAdminDashboard', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 4h5m-5 4h5', label: 'Organisations' }
+        ],
         orgAdmin: [
             { id: 'orgAdminTeamSkills', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', label: 'Team Skills' },
             { id: 'orgAdminDashboard', icon: 'M9 17v-2a3 3 0 013-3h2a3 3 0 013 3v2m-6 0h6M12 4a3 3 0 100 6 3 3 0 000-6z', label: 'Candidates' },
@@ -125,17 +129,47 @@ const Shell = ({ user, children, onNavigate, currentView }) => {
 const LoginScreen = ({ onNavigate }) => {
     const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
     const candidateUser = { name: 'Liam Gallagher', role: 'candidate', company: 'Candidate', avatar: 'https://placehold.co/100x100/60a5fa/1e3a8a?text=L' };
+    const platformAdminUser = { name: 'Platform Admin', role: 'platformAdmin', company: 'Payroll Platform', avatar: 'https://placehold.co/100x100/fde047/78350f?text=P' };
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900">
             <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg">
                 <div className="text-center"><h1 className="text-3xl font-bold text-slate-900 dark:text-white">Payroll Skills Platform</h1><p className="mt-2 text-slate-500 dark:text-slate-400">Welcome back! Please sign in.</p></div>
-                <div className="space-y-6">
+                <div className="space-y-4">
                     <button onClick={() => onNavigate('orgAdminDashboard', { user: orgAdminUser })} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700">Sign in as Payroll Manager</button>
                     <button onClick={() => onNavigate('candidateDashboard', { user: candidateUser })} className="w-full flex justify-center py-3 px-4 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">Sign in as Candidate</button>
+                    <button onClick={() => onNavigate('platformAdminDashboard', { user: platformAdminUser })} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-slate-500 hover:text-slate-700">Platform Admin</button>
                 </div>
             </div>
         </div>
+    );
+};
+
+const PlatformAdminDashboard = () => {
+    const clients = [
+        { name: 'ABC Corp', users: 5, testsThisMonth: 8, joined: '15 May 2025' },
+        { name: 'Payroll Solutions Ltd', users: 12, testsThisMonth: 25, joined: '02 Feb 2025' },
+        { name: 'London Accountants', users: 8, testsThisMonth: 14, joined: '21 Jan 2025' },
+    ];
+    return (
+         <>
+            <header className="mb-8"><h2 className="text-3xl font-bold">Platform Admin Dashboard</h2><p className="mt-1 text-slate-500">Manage all organisations on the platform.</p></header>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                 <h3 className="text-lg font-semibold mb-4">Client Organisations</h3>
+                  <table className="w-full text-left">
+                    <thead className="border-b border-slate-200 dark:border-slate-600 text-sm text-slate-500">
+                        <tr><th className="py-2">Organisation</th><th className="py-2">Active Users</th><th className="py-2">Tests This Month</th><th className="py-2">Joined</th></tr>
+                    </thead>
+                    <tbody>
+                        {clients.map(c => (
+                            <tr key={c.name} className="border-b border-slate-200 dark:border-slate-700">
+                                <td className="py-3 font-medium">{c.name}</td><td>{c.users}</td><td>{c.testsThisMonth}</td><td>{c.joined}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
     );
 };
 
@@ -153,16 +187,48 @@ const TeamSkillsDashboard = ({ db, appId }) => {
     }, [db, appId]);
 
     const teamStats = useMemo(() => {
-        if (results.length === 0) return { averageScore: 0, testCount: 0 };
+        if (results.length === 0) return { averageScore: 0, testCount: 0, topSkill: 'N/A', topics: {} };
+        
         const totalScore = results.reduce((sum, r) => sum + r.percentage, 0);
-        return { averageScore: Math.round(totalScore / results.length), testCount: results.length };
+        
+        const allTopicScores = {};
+        results.forEach(r => {
+            if (r.topicScores) {
+                Object.entries(r.topicScores).forEach(([topic, score]) => {
+                    if (!allTopicScores[topic]) allTopicScores[topic] = [];
+                    allTopicScores[topic].push(score);
+                });
+            }
+        });
+
+        const avgTopicScores = {};
+        let topSkill = 'N/A';
+        let maxAvg = 0;
+
+        for (const topic in allTopicScores) {
+            const avg = allTopicScores[topic].reduce((a, b) => a + b, 0) / allTopicScores[topic].length;
+            avgTopicScores[topic] = Math.round(avg);
+            if (avg > maxAvg) {
+                maxAvg = avg;
+                topSkill = topic;
+            }
+        }
+        
+        return {
+            averageScore: Math.round(totalScore / results.length),
+            testCount: results.length,
+            topSkill,
+            avgTopicScores,
+        };
     }, [results]);
 
-    const teamPerformanceData = {
-        labels: results.map(r => r.userName),
+    const teamRadarData = {
+        labels: Object.keys(teamStats.avgTopicScores),
         datasets: [{
-            label: 'Overall Score', data: results.map(r => r.percentage),
-            backgroundColor: results.map(r => r.percentage >= 80 ? '#10b981' : r.percentage >= 60 ? '#f59e0b' : '#ef4444'),
+            label: 'Team Average', data: Object.values(teamStats.avgTopicScores), fill: true,
+            backgroundColor: 'rgba(56, 189, 248, 0.2)',
+            borderColor: 'rgb(56, 189, 248)',
+            pointBackgroundColor: 'rgb(56, 189, 248)',
         }]
     };
 
@@ -173,12 +239,41 @@ const TeamSkillsDashboard = ({ db, appId }) => {
             <header className="mb-8"><h2 className="text-3xl font-bold">Team Skills Overview</h2><p className="mt-1 text-slate-500">An at-a-glance summary of your team's payroll competencies.</p></header>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Team Average Score</p><p className="text-4xl font-bold mt-2 text-sky-600">{teamStats.averageScore}%</p></div>
-                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Tests Completed</p><p className="text-4xl font-bold mt-2 text-emerald-600">{teamStats.testCount}</p></div>
-                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Area for Development</p><p className="text-4xl font-bold mt-2 text-amber-600">Statutory Pay</p></div>
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Top Team Skill</p><p className="text-4xl font-bold mt-2 text-emerald-600">{teamStats.topSkill}</p></div>
+                <div className="kpi-card"><p className="text-sm font-medium text-slate-500">Tests Completed</p><p className="text-4xl font-bold mt-2 text-indigo-600">{teamStats.testCount}</p></div>
             </div>
-            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-semibold mb-4">Team Performance</h3>
-                {results.length > 0 ? <Bar data={teamPerformanceData} options={{ scales: { y: { beginAtZero: true, max: 100, ticks: { callback: value => value + '%' } } }, plugins: { legend: { display: false } } }}/> : <p>No results yet.</p>}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+                <div className="lg:col-span-3 bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-semibold mb-4">Skills Matrix</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left table-auto">
+                            <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-700">
+                                <tr>
+                                    <th className="p-3">Team Member</th>
+                                    {Object.keys(teamStats.avgTopicScores).map(topic => <th key={topic} className="p-3 text-center">{topic}</th>)}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {results.map(r => (
+                                    <tr key={r.id} className="border-b dark:border-slate-700">
+                                        <td className="p-2 font-semibold">{r.userName}</td>
+                                        {Object.keys(teamStats.avgTopicScores).map(topic => (
+                                            <td key={topic} className="p-2 text-center">
+                                                <span className={`skill-cell ${r.topicScores && r.topicScores[topic] >= 80 ? 'bg-emerald-500' : r.topicScores && r.topicScores[topic] >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}>
+                                                    {r.topicScores ? r.topicScores[topic] || 0 : 0}%
+                                                </span>
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div className="lg:col-span-2 bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-semibold mb-4">Team Competency Radar</h3>
+                    {Object.keys(teamStats.avgTopicScores).length > 0 ? <Radar data={teamRadarData} options={{ scales: { r: { beginAtZero: true, max: 100, stepSize: 20 } }, plugins: { legend: { position: 'top' } } }}/> : <p>No data for radar.</p>}
+                </div>
             </div>
         </>
     );
@@ -366,13 +461,16 @@ const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
 
 const QuestionBank = ({ db, appId }) => {
     const [questions, setQuestions] = useState([]);
-    const [newQuestion, setNewQuestion] = useState({ text: '', options: ['', '', '', ''], answer: '', topic: 'General' });
+    const [newQuestion, setNewQuestion] = useState({ text: '', options: ['', '', '', ''], answer: '', topic: 'General', difficulty: 'Administrator' });
     const [editingQuestion, setEditingQuestion] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [topics, setTopics] = useState(["PAYE", "National Insurance", "Statutory Pay", "Pensions", "General"]);
     const [newTopic, setNewTopic] = useState('');
+    const [filter, setFilter] = useState('All');
+    
+    const difficulties = ["Administrator", "Specialist", "Manager"];
 
     useEffect(() => {
         const q = query(collection(db, `/artifacts/${appId}/public/data/question_bank`));
@@ -404,7 +502,7 @@ const QuestionBank = ({ db, appId }) => {
             setError("The correct answer must be one of the four options provided."); return;
         }
 
-        const questionData = { text: newQuestion.text, options: newQuestion.options, answer: newQuestion.answer, topic: newQuestion.topic };
+        const questionData = { text: newQuestion.text, options: newQuestion.options, answer: newQuestion.answer, topic: newQuestion.topic, difficulty: newQuestion.difficulty };
 
         try {
             if (editingQuestion) {
@@ -415,7 +513,7 @@ const QuestionBank = ({ db, appId }) => {
                 await addDoc(collection(db, `/artifacts/${appId}/public/data/question_bank`), questionData);
                 setSuccess('Question added successfully!');
             }
-            setNewQuestion({ text: '', options: ['', '', '', ''], answer: '', topic: 'General' });
+            setNewQuestion({ text: '', options: ['', '', '', ''], answer: '', topic: 'General', difficulty: 'Administrator' });
             setEditingQuestion(null);
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
@@ -430,6 +528,7 @@ const QuestionBank = ({ db, appId }) => {
             options: question.options,
             answer: question.answer,
             topic: question.topic,
+            difficulty: question.difficulty || 'Administrator'
         });
         window.scrollTo(0, 0);
     };
@@ -440,6 +539,8 @@ const QuestionBank = ({ db, appId }) => {
             setNewTopic('');
         }
     };
+    
+    const filteredQuestions = filter === 'All' ? questions : questions.filter(q => q.topic === filter);
 
     return (
         <>
@@ -448,11 +549,19 @@ const QuestionBank = ({ db, appId }) => {
                 <h3 className="text-lg font-semibold mb-4">{editingQuestion ? 'Edit Question' : 'Add New Question'}</h3>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                     <div><label className="block text-sm font-medium">Question Text</label><input type="text" name="text" value={newQuestion.text} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" /></div>
-                    <div>
-                        <label className="block text-sm font-medium">Topic</label>
-                        <select name="topic" value={newQuestion.topic} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md">
-                            {topics.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium">Topic</label>
+                            <select name="topic" value={newQuestion.topic} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md">
+                                {topics.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium">Difficulty</label>
+                            <select name="difficulty" value={newQuestion.difficulty} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md">
+                                {difficulties.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                        </div>
                     </div>
                     {newQuestion.options.map((opt, index) => (
                         <div key={index}><label className="block text-sm font-medium">Option {index + 1}</label><input type="text" name="option" value={opt} onChange={(e) => handleInputChange(e, index)} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" /></div>
@@ -462,7 +571,7 @@ const QuestionBank = ({ db, appId }) => {
                     {success && <p className="text-sm text-emerald-500">{success}</p>}
                     <div className="flex items-center gap-4">
                         <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">{editingQuestion ? 'Update Question' : 'Add Question'}</button>
-                        {editingQuestion && <button onClick={() => { setEditingQuestion(null); setNewQuestion({ text: '', options: ['', '', '', ''], answer: '', topic: 'General' }); }} className="text-sm text-slate-500 hover:underline">Cancel Edit</button>}
+                        {editingQuestion && <button onClick={() => { setEditingQuestion(null); setNewQuestion({ text: '', options: ['', '', '', ''], answer: '', topic: 'General', difficulty: 'Administrator' }); }} className="text-sm text-slate-500 hover:underline">Cancel Edit</button>}
                     </div>
                 </form>
                  <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
@@ -471,8 +580,14 @@ const QuestionBank = ({ db, appId }) => {
                 </div>
             </div>
              <div className="mt-8 bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-semibold mb-4">Existing Questions</h3>
-                {loading ? <p>Loading...</p> : <div className="space-y-2">{questions.map(q => <div key={q.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md flex justify-between items-center"><div className="text-sm"><span className="font-semibold bg-sky-100 text-sky-800 text-xs py-1 px-2 rounded-full mr-2">{q.topic}</span>{q.text}</div><button onClick={() => handleEditClick(q)} className="text-sm text-sky-600 hover:underline font-semibold ml-4">Edit</button></div>)}</div>}
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold">Existing Questions</h3>
+                    <select value={filter} onChange={(e) => setFilter(e.target.value)} className="block px-3 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm">
+                        <option value="All">All Topics</option>
+                        {topics.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                </div>
+                {loading ? <p>Loading...</p> : <div className="space-y-2">{filteredQuestions.map(q => <div key={q.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md flex justify-between items-center"><div className="text-sm"><span className="font-semibold bg-sky-100 text-sky-800 text-xs py-1 px-2 rounded-full mr-2">{q.topic}</span>{q.text}</div><button onClick={() => handleEditClick(q)} className="text-sm text-sky-600 hover:underline font-semibold ml-4">Edit</button></div>)}</div>}
             </div>
         </>
     );
@@ -745,6 +860,7 @@ const TestInProgress = ({ user, testId, db, appId, onNavigate }) => {
         <div className="max-w-3xl mx-auto">
             <header className="flex justify-between items-center mb-6">
                 <div><h2 className="text-2xl font-bold">{test.name}</h2><p className="text-slate-500">Question {currentQuestionIndex + 1} of {questions.length}</p></div>
+                <button onClick={() => onNavigate('candidateDashboard', { user })} className="text-sm text-slate-500 hover:underline">Exit Test</button>
             </header>
             <div className="mb-6 bg-slate-200 dark:bg-slate-700 rounded-full h-2.5"><div className="bg-sky-500 h-2.5 rounded-full" style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}></div></div>
             <div className="bg-white dark:bg-slate-800/75 p-8 rounded-lg border border-slate-200 dark:border-slate-700">
