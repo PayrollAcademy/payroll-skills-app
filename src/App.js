@@ -561,21 +561,29 @@ const TestBuilder = ({ user, db, appId, onNavigate }) => {
 
 const CandidateWelcome = ({ user, db, appId, onNavigate }) => {
     const [tests, setTests] = useState([]);
+    const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const q = query(collection(db, `/artifacts/${appId}/public/data/tests`));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchTests = onSnapshot(query(collection(db, `/artifacts/${appId}/public/data/tests`)), (snapshot) => {
             setTests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            setLoading(false);
         });
-        return () => unsubscribe();
-    }, [db, appId]);
+
+        const fetchResults = onSnapshot(query(collection(db, `/artifacts/${appId}/public/data/results`), where("userName", "==", user.name), where("isShared", "==", true)), (snapshot) => {
+            setResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        setLoading(false);
+        return () => {
+            fetchTests();
+            fetchResults();
+        };
+    }, [db, appId, user.name]);
 
     return (
         <>
             <header className="mb-8"><h2 className="text-3xl font-bold">Welcome, {user.name.split(' ')[0]}!</h2></header>
-            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700 mb-8">
                 <h3 className="text-lg font-semibold mb-4">Available Tests</h3>
                 {loading ? <p>Loading tests...</p> : (
                     <div className="space-y-3">
@@ -585,6 +593,19 @@ const CandidateWelcome = ({ user, db, appId, onNavigate }) => {
                                 <button onClick={() => onNavigate('candidateTestInProgress', { user, testId: t.id })} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Begin Test</button>
                             </div>
                         )) : <p className="text-sm text-slate-500">There are no tests available at this time.</p>}
+                    </div>
+                )}
+            </div>
+             <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">My Results</h3>
+                {loading ? <p>Loading results...</p> : (
+                    <div className="space-y-3">
+                        {results.length > 0 ? results.map(r => (
+                            <div key={r.id} className="p-4 border rounded-lg flex justify-between items-center">
+                                <div><p className="font-semibold">Completed on {new Date(r.timestamp).toLocaleDateString()}</p><p className="text-sm text-slate-500">Score: {r.percentage}%</p></div>
+                                <button onClick={() => onNavigate('orgAdminReportDetail', { user, result: r })} className="text-sky-600 hover:underline text-sm font-semibold">View Details</button>
+                            </div>
+                        )) : <p className="text-sm text-slate-500">You have no shared results yet.</p>}
                     </div>
                 )}
             </div>
