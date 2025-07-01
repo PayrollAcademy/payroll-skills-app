@@ -367,11 +367,12 @@ const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
 const QuestionBank = ({ db, appId }) => {
     const [questions, setQuestions] = useState([]);
     const [newQuestion, setNewQuestion] = useState({ text: '', options: ['', '', '', ''], answer: '', topic: 'General' });
+    const [editingQuestion, setEditingQuestion] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-
-    const topics = ["PAYE", "National Insurance", "Statutory Pay", "Pensions", "General"];
+    const [topics, setTopics] = useState(["PAYE", "National Insurance", "Statutory Pay", "Pensions", "General"]);
+    const [newTopic, setNewTopic] = useState('');
 
     useEffect(() => {
         const q = query(collection(db, `/artifacts/${appId}/public/data/question_bank`));
@@ -393,7 +394,7 @@ const QuestionBank = ({ db, appId }) => {
         }
     };
 
-    const handleAddQuestion = async (e) => {
+    const handleFormSubmit = async (e) => {
         e.preventDefault();
         setError(''); setSuccess('');
         if (!newQuestion.text || newQuestion.options.some(opt => !opt) || !newQuestion.answer) {
@@ -402,15 +403,41 @@ const QuestionBank = ({ db, appId }) => {
         if (!newQuestion.options.includes(newQuestion.answer)) {
             setError("The correct answer must be one of the four options provided."); return;
         }
+
+        const questionData = { text: newQuestion.text, options: newQuestion.options, answer: newQuestion.answer, topic: newQuestion.topic };
+
         try {
-            await addDoc(collection(db, `/artifacts/${appId}/public/data/question_bank`), {
-                text: newQuestion.text, options: newQuestion.options, answer: newQuestion.answer, topic: newQuestion.topic
-            });
+            if (editingQuestion) {
+                const questionRef = doc(db, `/artifacts/${appId}/public/data/question_bank`, editingQuestion.id);
+                await updateDoc(questionRef, questionData);
+                setSuccess('Question updated successfully!');
+            } else {
+                await addDoc(collection(db, `/artifacts/${appId}/public/data/question_bank`), questionData);
+                setSuccess('Question added successfully!');
+            }
             setNewQuestion({ text: '', options: ['', '', '', ''], answer: '', topic: 'General' });
-            setSuccess('Question added successfully!');
+            setEditingQuestion(null);
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
             setError("Could not save the question.");
+        }
+    };
+
+    const handleEditClick = (question) => {
+        setEditingQuestion(question);
+        setNewQuestion({
+            text: question.text,
+            options: question.options,
+            answer: question.answer,
+            topic: question.topic,
+        });
+        window.scrollTo(0, 0);
+    };
+
+    const handleAddTopic = () => {
+        if (newTopic && !topics.includes(newTopic)) {
+            setTopics([...topics, newTopic]);
+            setNewTopic('');
         }
     };
 
@@ -418,8 +445,8 @@ const QuestionBank = ({ db, appId }) => {
         <>
             <header className="mb-8"><h2 className="text-3xl font-bold">Question Bank</h2><p className="mt-1 text-slate-500">Add, view, and manage test questions.</p></header>
             <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-semibold mb-4">Add New Question</h3>
-                <form onSubmit={handleAddQuestion} className="space-y-4">
+                <h3 className="text-lg font-semibold mb-4">{editingQuestion ? 'Edit Question' : 'Add New Question'}</h3>
+                <form onSubmit={handleFormSubmit} className="space-y-4">
                     <div><label className="block text-sm font-medium">Question Text</label><input type="text" name="text" value={newQuestion.text} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" /></div>
                     <div>
                         <label className="block text-sm font-medium">Topic</label>
@@ -433,12 +460,19 @@ const QuestionBank = ({ db, appId }) => {
                     <div><label className="block text-sm font-medium">Correct Answer</label><input type="text" name="answer" value={newQuestion.answer} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" placeholder="Copy the correct option text here" /></div>
                     {error && <p className="text-sm text-red-500">{error}</p>}
                     {success && <p className="text-sm text-emerald-500">{success}</p>}
-                    <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Add Question</button>
+                    <div className="flex items-center gap-4">
+                        <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">{editingQuestion ? 'Update Question' : 'Add Question'}</button>
+                        {editingQuestion && <button onClick={() => { setEditingQuestion(null); setNewQuestion({ text: '', options: ['', '', '', ''], answer: '', topic: 'General' }); }} className="text-sm text-slate-500 hover:underline">Cancel Edit</button>}
+                    </div>
                 </form>
+                 <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <h4 className="text-md font-semibold mb-2">Manage Topics</h4>
+                    <div className="flex gap-2"><input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} placeholder="Add new topic" className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" /><button onClick={handleAddTopic} className="bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 whitespace-nowrap">Add Topic</button></div>
+                </div>
             </div>
              <div className="mt-8 bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-semibold mb-4">Existing Questions</h3>
-                {loading ? <p>Loading...</p> : <div className="space-y-2">{questions.map(q => <div key={q.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md text-sm"><span className="font-semibold bg-sky-100 text-sky-800 text-xs py-1 px-2 rounded-full mr-2">{q.topic}</span>{q.text}</div>)}</div>}
+                {loading ? <p>Loading...</p> : <div className="space-y-2">{questions.map(q => <div key={q.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md flex justify-between items-center"><div className="text-sm"><span className="font-semibold bg-sky-100 text-sky-800 text-xs py-1 px-2 rounded-full mr-2">{q.topic}</span>{q.text}</div><button onClick={() => handleEditClick(q)} className="text-sm text-sky-600 hover:underline font-semibold ml-4">Edit</button></div>)}</div>}
             </div>
         </>
     );
