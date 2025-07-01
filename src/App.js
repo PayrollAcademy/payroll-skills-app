@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Bar, Radar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc, writeBatch } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
