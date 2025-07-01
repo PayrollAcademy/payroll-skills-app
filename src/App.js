@@ -289,6 +289,17 @@ const CandidateDashboard = ({ user, db, appId, onNavigate }) => {
         });
         return () => unsubscribe();
     }, [db, appId]);
+    
+    const handleDeleteResult = async (resultId) => {
+        if (window.confirm("Are you sure you want to permanently delete this test result?")) {
+            try {
+                await deleteDoc(doc(db, `/artifacts/${appId}/public/data/results`, resultId));
+            } catch (error) {
+                console.error("Error deleting result: ", error);
+                alert("Could not delete the result.");
+            }
+        }
+    };
 
     if (loading) return <div>Loading candidates...</div>;
 
@@ -310,6 +321,7 @@ const CandidateDashboard = ({ user, db, appId, onNavigate }) => {
                                     <td className="py-3 px-4">{r.isShared ? <span className="text-emerald-500 font-semibold">Shared</span> : <span className="text-slate-500">Not Shared</span>}</td>
                                     <td className="py-3 px-4 text-right">
                                         <button onClick={() => onNavigate('orgAdminReportDetail', { user, result: r })} className="text-sky-600 hover:underline text-sm font-semibold">View Report</button>
+                                        <button onClick={() => handleDeleteResult(r.id)} className="text-red-500 hover:underline text-sm font-semibold ml-4">Delete</button>
                                     </td>
                                 </tr>
                             )) : <tr><td colSpan="4" className="text-center py-4">No results have been submitted yet.</td></tr>}
