@@ -106,7 +106,7 @@ const Shell = ({ user, children, onNavigate, currentView }) => {
                     <nav className="p-4 space-y-2">
                          {navigationLinks.map(item => (
                             <a key={item.id} href="#" onClick={(e) => { e.preventDefault(); onNavigate(item.id, { user }); }}
-                               className={`sidebar-link text-slate-600 dark:text-slate-300 ${currentView === item.id ? 'active' : ''}`}>
+                               className={`sidebar-link ${currentView === item.id ? 'active' : ''}`}>
                                 <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon}></path></svg>
                                 {item.label}
                             </a>
