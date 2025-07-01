@@ -258,10 +258,8 @@ const TeamSkillsDashboard = ({ db, appId }) => {
                                     <tr key={r.id} className="border-b dark:border-slate-700">
                                         <td className="p-2 font-semibold">{r.userName}</td>
                                         {Object.keys(teamStats.avgTopicScores).map(topic => (
-                                            <td key={topic} className="p-2 text-center">
-                                                <span className={`skill-cell ${r.topicScores && r.topicScores[topic] >= 80 ? 'bg-emerald-500' : r.topicScores && r.topicScores[topic] >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}>
-                                                    {r.topicScores ? r.topicScores[topic] || 0 : 0}%
-                                                </span>
+                                            <td key={topic} className={`p-2 text-center font-bold text-white ${r.topicScores && r.topicScores[topic] >= 80 ? 'bg-emerald-500' : r.topicScores && r.topicScores[topic] >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}>
+                                                {r.topicScores ? r.topicScores[topic] || 0 : 0}%
                                             </td>
                                         ))}
                                     </tr>
