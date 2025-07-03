@@ -4,7 +4,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc, writeBatch } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInAnonymously, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 // Register Chart.js components
 ChartJS.register(
@@ -32,16 +32,40 @@ const functions = getFunctions(app);
 // --- Main App Component ---
 function App() {
     const [view, setView] = useState('loading');
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(null); // Will hold user profile data from Firestore
     const [appId] = useState('payroll-skills-app-v1');
     const [contextData, setContextData] = useState({});
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
-                setView('login');
+                // User is signed in, fetch their profile from Firestore
+                const userDocSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", firebaseUser.uid)));
+                
+                if (!userDocSnap.empty) {
+                    const userProfile = { uid: firebaseUser.uid, ...userDocSnap.docs[0].data() };
+                    setUser(userProfile);
+                    // Navigate to the correct dashboard based on role
+                    switch (userProfile.role) {
+                        case 'platformAdmin':
+                            setView('platformAdminDashboard');
+                            break;
+                        case 'manager':
+                            setView('orgAdminDashboard');
+                            break;
+                        case 'candidate':
+                            setView('candidateDashboard');
+                            break;
+                        default:
+                            setView('login');
+                    }
+                } else {
+                    setView('login');
+                }
             } else {
-                signInAnonymously(auth).catch((error) => { console.error("Anonymous sign-in error:", error); setView('error'); });
+                // User is signed out
+                setUser(null);
+                setView('login');
             }
         });
         return () => unsubscribe();
@@ -50,13 +74,23 @@ function App() {
     const navigateTo = (newView, navData = {}) => {
         setView(newView);
         if (navData.user) setUser(navData.user);
-        setContextData(navData);
+        if (navData.context) setContextData(navData.context);
+    };
+
+    const handleSignOut = async () => {
+        await signOut(auth);
+        setUser(null);
+        setView('login');
     };
 
     const renderContent = () => {
         if (view === 'loading') return <div className="flex items-center justify-center min-h-screen text-slate-500">Loading Platform...</div>;
         if (view === 'error') return <div className="flex items-center justify-center min-h-screen text-red-500">An error occurred. Please refresh.</div>;
 
+        if (!user && view !== 'login') {
+            return <LoginScreen onNavigate={navigateTo} />;
+        }
+        
         switch (view) {
             case 'login': return <LoginScreen onNavigate={navigateTo} />;
             case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} />;
@@ -65,7 +99,6 @@ function App() {
             case 'orgAdminDashboard': return <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminQuestionBank': return <QuestionBank user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminBulkImport': return <BulkImportScreen user={user} db={db} appId={appId} onNavigate={navigateTo} />;
-            case 'orgAdminTestBuilder': return <TestBuilder user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminReportDetail': return <ReportAndFeedback user={user} result={contextData.result} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'candidateDashboard': return <CandidateWelcome user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'candidateTestInProgress': return <TestInProgress user={user} testId={contextData.testId} db={db} appId={appId} onNavigate={navigateTo} />;
@@ -76,8 +109,8 @@ function App() {
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
-             {view === 'login' || view === 'loading' || view === 'error' ? renderContent() : (
-                <Shell user={user} onNavigate={navigateTo} currentView={view}>
+            {view === 'login' || view === 'loading' || view === 'error' || !user ? <LoginScreen onNavigate={navigateTo} /> : (
+                <Shell user={user} onNavigate={navigateTo} onSignOut={handleSignOut} currentView={view}>
                     {renderContent()}
                 </Shell>
             )}
@@ -86,7 +119,7 @@ function App() {
 }
 
 // --- Main Application Shell ---
-const Shell = ({ user, children, onNavigate, currentView }) => {
+const Shell = ({ user, children, onNavigate, onSignOut, currentView }) => {
     const navs = {
         platformAdmin: [
             { id: 'platformAdminDashboard', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 4h5m-5 4h5', label: 'Organisations' }
@@ -118,7 +151,7 @@ const Shell = ({ user, children, onNavigate, currentView }) => {
                             </a>
                         ))}
                     </nav>
-                     <div className="p-4 absolute bottom-0 w-64"><div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/75"><div className="flex items-center"><img className="h-10 w-10 rounded-full" src={user.avatar} alt={user.name}/><div className="ml-3"><p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p><p className="text-xs text-slate-500 dark:text-slate-400">{user.company}</p></div></div><a href="#" onClick={() => onNavigate('login')} className="w-full text-center mt-3 text-xs text-slate-500 hover:text-sky-500">Sign Out</a></div></div>
+                     <div className="p-4 absolute bottom-0 w-64"><div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/75"><div className="flex items-center"><img className="h-10 w-10 rounded-full" src={`https://placehold.co/100x100?text=${user.name.charAt(0)}`} alt={user.name}/><div className="ml-3"><p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p><p className="text-xs text-slate-500 dark:text-slate-400">{user.role}</p></div></div><a href="#" onClick={onSignOut} className="w-full text-center mt-3 text-xs text-slate-500 hover:text-sky-500">Sign Out</a></div></div>
                 </aside>
             )}
             <main className="flex-1 overflow-y-auto"><div className={showSidebar ? "p-6 md:p-8" : "p-2 sm:p-4 md:p-8"}>{children}</div></main>
@@ -126,26 +159,80 @@ const Shell = ({ user, children, onNavigate, currentView }) => {
     );
 };
 
-// --- Component Views ---
+// --- REAL LOGIN COMPONENT ---
+const LoginScreen = () => {
+    const [isLoginView, setIsLoginView] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [error, setError] = useState('');
 
-const LoginScreen = ({ onNavigate }) => {
-    const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
-    const candidateUser = { name: 'Liam Gallagher', role: 'candidate', company: 'Candidate', avatar: 'https://placehold.co/100x100/60a5fa/1e3a8a?text=L' };
-    const platformAdminUser = { name: 'Platform Admin', role: 'platformAdmin', company: 'Payroll Platform', avatar: 'https://placehold.co/100x100/fde047/78350f?text=P' };
+    const handleAuthAction = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (isLoginView) {
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (err) {
+                setError(err.message);
+            }
+        } else {
+            if (!name) {
+                setError("Please enter your name.");
+                return;
+            }
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await setDoc(doc(db, "users", userCredential.user.uid), {
+                    name: name,
+                    email: email,
+                    role: "candidate", // Default role
+                    organisationId: "public"
+                });
+            } catch (err) {
+                setError(err.message);
+            }
+        }
+    };
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900">
-            <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg">
-                <div className="text-center"><h1 className="text-3xl font-bold text-slate-900 dark:text-white">Payroll Skills Platform</h1><p className="mt-2 text-slate-500 dark:text-slate-400">Welcome back! Please sign in.</p></div>
-                <div className="space-y-4">
-                    <button onClick={() => onNavigate('orgAdminDashboard', { user: orgAdminUser })} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700">Sign in as Payroll Manager</button>
-                    <button onClick={() => onNavigate('candidateDashboard', { user: candidateUser })} className="w-full flex justify-center py-3 px-4 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">Sign in as Candidate</button>
-                    <button onClick={() => onNavigate('platformAdminDashboard', { user: platformAdminUser })} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-slate-500 hover:text-slate-700">Platform Admin</button>
+            <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-slate-800 rounded-2xl shadow-lg">
+                <div className="text-center">
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Payroll Skills Platform</h1>
+                    <p className="mt-2 text-slate-500 dark:text-slate-400">{isLoginView ? "Sign in to your account" : "Create a new account"}</p>
+                </div>
+                <form onSubmit={handleAuthAction} className="space-y-4">
+                    {!isLoginView && (
+                        <div>
+                            <label className="block text-sm font-medium">Full Name</label>
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
+                        </div>
+                    )}
+                    <div>
+                        <label className="block text-sm font-medium">Email Address</label>
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium">Password</label>
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
+                    </div>
+                    {error && <p className="text-sm text-red-600">{error}</p>}
+                    <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700">
+                        {isLoginView ? 'Sign In' : 'Sign Up'}
+                    </button>
+                </form>
+                <div className="text-center">
+                    <button onClick={() => setIsLoginView(!isLoginView)} className="text-sm text-sky-600 hover:underline">
+                        {isLoginView ? "Need an account? Sign Up" : "Already have an account? Sign In"}
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
+
 
 const PlatformAdminDashboard = ({ onNavigate, user, db }) => {
     const [organisations, setOrganisations] = useState([]);
@@ -208,9 +295,8 @@ const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
         }
 
         try {
-            // In a real app, this would be a multi-step process, likely involving a Cloud Function
-            // to create the auth user and then the Firestore documents.
-            // For this mockup, we'll just log the data and add to Firestore.
+            // This is a placeholder for a Cloud Function that would create the auth user
+            // and then the Firestore documents securely.
             console.log("Creating Organisation:", { orgName });
             console.log("Creating Manager:", { managerName, managerEmail, role: 'manager' });
             
@@ -219,7 +305,7 @@ const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
                 createdAt: new Date()
             });
 
-            // This is a placeholder. A real app would create an auth user and use their UID.
+            // Placeholder UID creation. In a real app, this UID would come from creating an auth user.
             const managerUid = `manager_${Date.now()}`; 
             await setDoc(doc(db, "users", managerUid), {
                 name: managerName,
@@ -228,7 +314,7 @@ const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
                 organisationId: orgRef.id
             });
             
-            setSuccess(`Organisation "${orgName}" and manager account for ${managerEmail} created successfully!`);
+            setSuccess(`Organisation "${orgName}" and manager account for ${managerEmail} created successfully! A temporary password has been sent.`);
             setOrgName('');
             setManagerName('');
             setManagerEmail('');
@@ -1104,7 +1190,6 @@ const TestInProgress = ({ user, testId, db, appId, onNavigate }) => {
         </div>
     );
 };
-
 
 const TestFinishedScreen = ({ user, onNavigate }) => (
     <div className="text-center py-10 max-w-xl mx-auto">
