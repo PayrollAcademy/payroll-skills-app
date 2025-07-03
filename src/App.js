@@ -62,7 +62,8 @@ function App() {
             case 'platformAdminDashboard': return <PlatformAdminDashboard />;
             case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} db={db} appId={appId} />;
             case 'orgAdminDashboard': return <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo} />;
-            case 'orgAdminQuestionBank': return <QuestionBank user={user} db={db} appId={appId} />;
+            case 'orgAdminQuestionBank': return <QuestionBank user={user} db={db} appId={appId} onNavigate={navigateTo} />;
+            case 'orgAdminBulkImport': return <BulkImportScreen user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminTestBuilder': return <TestBuilder user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminReportDetail': return <ReportAndFeedback user={user} result={contextData.result} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'candidateDashboard': return <CandidateWelcome user={user} db={db} appId={appId} onNavigate={navigateTo} />;
@@ -469,7 +470,7 @@ const ReportAndFeedback = ({ user, result, db, appId, onNavigate }) => {
 };
 
 
-const QuestionBank = ({ db, appId }) => {
+const QuestionBank = ({ user, db, appId, onNavigate }) => {
     const [questions, setQuestions] = useState([]);
     const [newQuestion, setNewQuestion] = useState({ text: '', options: ['', '', '', ''], answer: '', topic: 'General', difficulty: 'Administrator' });
     const [editingQuestion, setEditingQuestion] = useState(null);
@@ -554,7 +555,13 @@ const QuestionBank = ({ db, appId }) => {
 
     return (
         <>
-            <header className="mb-8"><h2 className="text-3xl font-bold">Question Bank</h2><p className="mt-1 text-slate-500">Add, view, and manage test questions.</p></header>
+            <header className="mb-8 flex justify-between items-center">
+                <div>
+                    <h2 className="text-3xl font-bold">Question Bank</h2>
+                    <p className="mt-1 text-slate-500">Add, view, and manage test questions.</p>
+                </div>
+                <button onClick={() => onNavigate('orgAdminBulkImport', { user })} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Bulk Upload CSV</button>
+            </header>
             <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-semibold mb-4">{editingQuestion ? 'Edit Question' : 'Add New Question'}</h3>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -598,6 +605,93 @@ const QuestionBank = ({ db, appId }) => {
                     </select>
                 </div>
                 {loading ? <p>Loading...</p> : <div className="space-y-2">{filteredQuestions.map(q => <div key={q.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md flex justify-between items-center"><div className="text-sm"><span className="font-semibold bg-sky-100 text-sky-800 text-xs py-1 px-2 rounded-full mr-2">{q.topic}</span>{q.text}</div><button onClick={() => handleEditClick(q)} className="text-sm text-sky-600 hover:underline font-semibold ml-4">Edit</button></div>)}</div>}
+            </div>
+        </>
+    );
+};
+
+const BulkImportScreen = ({ user, db, appId, onNavigate }) => {
+    const [csvFile, setCsvFile] = useState(null);
+    const [uploadStatus, setUploadStatus] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleCsvUpload = () => {
+        if (!csvFile) {
+            setUploadStatus('Please select a CSV file first.');
+            return;
+        }
+        setIsUploading(true);
+        setUploadStatus('Processing file...');
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = e.target.result;
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 2) {
+                setUploadStatus('Error: CSV file must contain a header row and at least one question.');
+                setIsUploading(false);
+                return;
+            }
+            const headers = lines.shift().split(',').map(h => h.trim());
+            
+            const requiredHeaders = ['text', 'option1', 'option2', 'option3', 'option4', 'answer', 'topic', 'difficulty'];
+            if (requiredHeaders.some((h, i) => h !== headers[i])) {
+                setUploadStatus(`Error: CSV headers must be exactly: ${requiredHeaders.join(',')}`);
+                setIsUploading(false);
+                return;
+            }
+
+            const batch = writeBatch(db);
+            let count = 0;
+            lines.forEach((line, index) => {
+                const data = line.split(',');
+                if (data.length === 8) {
+                    const questionData = {
+                        text: data[0].trim(),
+                        options: [data[1].trim(), data[2].trim(), data[3].trim(), data[4].trim()],
+                        answer: data[5].trim(),
+                        topic: data[6].trim(),
+                        difficulty: data[7].trim(),
+                    };
+                    const newQuestionRef = doc(collection(db, `/artifacts/${appId}/public/data/question_bank`));
+                    batch.set(newQuestionRef, questionData);
+                    count++;
+                } else {
+                    console.warn(`Skipping line ${index + 2}: incorrect number of columns.`);
+                }
+            });
+
+            try {
+                await batch.commit();
+                setUploadStatus(`${count} questions uploaded successfully!`);
+                setCsvFile(null);
+            } catch (err) {
+                setUploadStatus('Error uploading questions.');
+                console.error(err);
+            }
+            setIsUploading(false);
+        };
+        reader.readAsText(csvFile);
+    };
+
+    return (
+        <>
+            <header className="mb-8"><h2 className="text-3xl font-bold">Bulk Import Questions</h2><p className="mt-1 text-slate-500">Upload a CSV file to add multiple questions at once.</p></header>
+            <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold mb-4">Upload Instructions</h3>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                    <li>Create a CSV file (e.g., in Excel or Google Sheets).</li>
+                    <li>The first row must be a header row with these exact column names, in this order:</li>
+                    <li className="my-2"><code className="text-xs bg-slate-100 dark:bg-slate-900 p-2 rounded-md">text,option1,option2,option3,option4,answer,topic,difficulty</code></li>
+                    <li>Each subsequent row should contain one question's data.</li>
+                    <li>Save the file in `.csv` format.</li>
+                </ol>
+                <div className="flex items-center gap-4 mt-6">
+                    <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files[0])} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100" />
+                    <button onClick={handleCsvUpload} disabled={isUploading || !csvFile} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 disabled:bg-slate-400">
+                        {isUploading ? 'Uploading...' : 'Upload CSV'}
+                    </button>
+                </div>
+                {uploadStatus && <p className="text-sm mt-4 font-medium">{uploadStatus}</p>}
             </div>
         </>
     );
