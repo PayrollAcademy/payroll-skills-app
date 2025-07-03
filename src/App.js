@@ -59,8 +59,8 @@ function App() {
 
         switch (view) {
             case 'login': return <LoginScreen onNavigate={navigateTo} />;
-            case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} appId={appId} />;
-            case 'platformAdminCreateOrg': return <CreateOrganisationScreen user={user} db={db} appId={appId} onNavigate={navigateTo} />;
+            case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} />;
+            case 'platformAdminCreateOrg': return <CreateOrganisationScreen user={user} db={db} onNavigate={navigateTo} />;
             case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} db={db} appId={appId} />;
             case 'orgAdminDashboard': return <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminQuestionBank': return <QuestionBank user={user} db={db} appId={appId} onNavigate={navigateTo} />;
@@ -147,12 +147,12 @@ const LoginScreen = ({ onNavigate }) => {
     );
 };
 
-const PlatformAdminDashboard = ({ onNavigate, user, db, appId }) => {
+const PlatformAdminDashboard = ({ onNavigate, user, db }) => {
     const [organisations, setOrganisations] = useState([]);
     const [loading, setLoading] = useState(true);
     
     useEffect(() => {
-        const q = query(collection(db, `/organisations`));
+        const q = query(collection(db, `organisations`));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setOrganisations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
@@ -190,7 +190,7 @@ const PlatformAdminDashboard = ({ onNavigate, user, db, appId }) => {
     );
 };
 
-const CreateOrganisationScreen = ({ user, db, appId, onNavigate }) => {
+const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
     const [orgName, setOrgName] = useState('');
     const [managerName, setManagerName] = useState('');
     const [managerEmail, setManagerEmail] = useState('');
