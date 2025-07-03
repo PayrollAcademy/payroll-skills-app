@@ -259,7 +259,7 @@ const TeamSkillsDashboard = ({ db, appId }) => {
                                     <tr key={r.id} className="border-b dark:border-slate-700">
                                         <td className="p-2 font-semibold">{r.userName}</td>
                                         {Object.keys(teamStats.avgTopicScores).map(topic => (
-                                            <td key={topic} className={`p-2 text-center font-bold text-white ${r.topicScores && r.topicScores[topic] >= 80 ? 'bg-emerald-500' : r.topicScores && r.topicScores[topic] >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}>
+                                            <td key={topic} className={`skill-cell ${r.topicScores && r.topicScores[topic] >= 80 ? 'bg-emerald-500' : r.topicScores && r.topicScores[topic] >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}>
                                                 {r.topicScores ? r.topicScores[topic] || 0 : 0}%
                                             </td>
                                         ))}
@@ -543,6 +543,17 @@ const QuestionBank = ({ user, db, appId, onNavigate }) => {
         });
         window.scrollTo(0, 0);
     };
+    
+    const handleDeleteQuestion = async (questionId) => {
+        if (window.confirm("Are you sure you want to delete this question? This action cannot be undone.")) {
+            try {
+                await deleteDoc(doc(db, `/artifacts/${appId}/public/data/question_bank`, questionId));
+            } catch (err) {
+                console.error("Error deleting question:", err);
+                setError("Could not delete the question.");
+            }
+        }
+    };
 
     const handleAddTopic = () => {
         if (newTopic && !topics.includes(newTopic)) {
@@ -604,7 +615,7 @@ const QuestionBank = ({ user, db, appId, onNavigate }) => {
                         {topics.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                 </div>
-                {loading ? <p>Loading...</p> : <div className="space-y-2">{filteredQuestions.map(q => <div key={q.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md flex justify-between items-center"><div className="text-sm"><span className="font-semibold bg-sky-100 text-sky-800 text-xs py-1 px-2 rounded-full mr-2">{q.topic}</span>{q.text}</div><button onClick={() => handleEditClick(q)} className="text-sm text-sky-600 hover:underline font-semibold ml-4">Edit</button></div>)}</div>}
+                {loading ? <p>Loading...</p> : <div className="space-y-2">{filteredQuestions.map(q => <div key={q.id} className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-md flex justify-between items-center"><div className="text-sm"><span className="font-semibold bg-sky-100 text-sky-800 text-xs py-1 px-2 rounded-full mr-2">{q.topic}</span>{q.text}</div><div className="flex gap-4"><button onClick={() => handleEditClick(q)} className="text-sm text-sky-600 hover:underline font-semibold">Edit</button><button onClick={() => handleDeleteQuestion(q.id)} className="text-sm text-red-500 hover:underline font-semibold">Delete</button></div></div>)}</div>}
             </div>
         </>
     );
