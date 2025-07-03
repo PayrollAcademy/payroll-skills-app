@@ -59,7 +59,8 @@ function App() {
 
         switch (view) {
             case 'login': return <LoginScreen onNavigate={navigateTo} />;
-            case 'platformAdminDashboard': return <PlatformAdminDashboard />;
+            case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} appId={appId} />;
+            case 'platformAdminCreateOrg': return <CreateOrganisationScreen user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} db={db} appId={appId} />;
             case 'orgAdminDashboard': return <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'orgAdminQuestionBank': return <QuestionBank user={user} db={db} appId={appId} onNavigate={navigateTo} />;
@@ -146,29 +147,133 @@ const LoginScreen = ({ onNavigate }) => {
     );
 };
 
-const PlatformAdminDashboard = () => {
-    const clients = [
-        { name: 'ABC Corp', users: 5, testsThisMonth: 8, joined: '15 May 2025' },
-        { name: 'Payroll Solutions Ltd', users: 12, testsThisMonth: 25, joined: '02 Feb 2025' },
-        { name: 'London Accountants', users: 8, testsThisMonth: 14, joined: '21 Jan 2025' },
-    ];
+const PlatformAdminDashboard = ({ onNavigate, user, db, appId }) => {
+    const [organisations, setOrganisations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+        const q = query(collection(db, `/organisations`));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setOrganisations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [db]);
+
+    if (loading) return <div>Loading organisations...</div>;
+
     return (
          <>
-            <header className="mb-8"><h2 className="text-3xl font-bold">Platform Admin Dashboard</h2><p className="mt-1 text-slate-500">Manage all organisations on the platform.</p></header>
+            <header className="mb-8 flex justify-between items-center">
+                <div>
+                    <h2 className="text-3xl font-bold">Platform Admin Dashboard</h2>
+                    <p className="mt-1 text-slate-500">Manage all organisations on the platform.</p>
+                </div>
+                <button onClick={() => onNavigate('platformAdminCreateOrg', { user })} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Create Organisation</button>
+            </header>
             <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                  <h3 className="text-lg font-semibold mb-4">Client Organisations</h3>
                   <table className="w-full text-left">
                     <thead className="border-b border-slate-200 dark:border-slate-600 text-sm text-slate-500">
-                        <tr><th className="py-2">Organisation</th><th className="py-2">Active Users</th><th className="py-2">Tests This Month</th><th className="py-2">Joined</th></tr>
+                        <tr><th className="py-2">Organisation</th><th className="py-2">Joined</th></tr>
                     </thead>
                     <tbody>
-                        {clients.map(c => (
-                            <tr key={c.name} className="border-b border-slate-200 dark:border-slate-700">
-                                <td className="py-3 font-medium">{c.name}</td><td>{c.users}</td><td>{c.testsThisMonth}</td><td>{c.joined}</td>
+                        {organisations.map(org => (
+                            <tr key={org.id} className="border-b border-slate-200 dark:border-slate-700">
+                                <td className="py-3 font-medium">{org.organisationName}</td><td>{new Date(org.createdAt.seconds * 1000).toLocaleDateString()}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+            </div>
+        </>
+    );
+};
+
+const CreateOrganisationScreen = ({ user, db, appId, onNavigate }) => {
+    const [orgName, setOrgName] = useState('');
+    const [managerName, setManagerName] = useState('');
+    const [managerEmail, setManagerEmail] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+
+        if (!orgName || !managerName || !managerEmail) {
+            setError('All fields are required.');
+            return;
+        }
+
+        try {
+            // In a real app, this would be a multi-step process, likely involving a Cloud Function
+            // to create the auth user and then the Firestore documents.
+            // For this mockup, we'll just log the data and add to Firestore.
+            console.log("Creating Organisation:", { orgName });
+            console.log("Creating Manager:", { managerName, managerEmail, role: 'manager' });
+            
+            const orgRef = await addDoc(collection(db, "organisations"), {
+                organisationName: orgName,
+                createdAt: new Date()
+            });
+
+            // This is a placeholder. A real app would create an auth user and use their UID.
+            const managerUid = `manager_${Date.now()}`; 
+            await setDoc(doc(db, "users", managerUid), {
+                name: managerName,
+                email: managerEmail,
+                role: "manager",
+                organisationId: orgRef.id
+            });
+            
+            setSuccess(`Organisation "${orgName}" and manager account for ${managerEmail} created successfully!`);
+            setOrgName('');
+            setManagerName('');
+            setManagerEmail('');
+
+        } catch (err) {
+            console.error("Creation Error:", err);
+            setError("Failed to create organisation.");
+        }
+    };
+
+    return (
+        <>
+            <header className="mb-8">
+                <h2 className="text-3xl font-bold">Create New Organisation</h2>
+                <p className="mt-1 text-slate-500">Set up a new client company and their primary manager account.</p>
+            </header>
+            <div className="max-w-2xl">
+                <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <form onSubmit={handleCreate} className="space-y-6">
+                        <div>
+                            <h3 className="text-lg font-semibold border-b pb-2 mb-4">Organisation Details</h3>
+                            <div>
+                                <label className="block text-sm font-medium">Organisation Name</label>
+                                <input type="text" value={orgName} onChange={(e) => setOrgName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
+                            </div>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold border-b pb-2 mb-4">Primary Manager Account</h3>
+                             <div>
+                                <label className="block text-sm font-medium">Manager's Full Name</label>
+                                <input type="text" value={managerName} onChange={(e) => setManagerName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
+                            </div>
+                             <div className="mt-4">
+                                <label className="block text-sm font-medium">Manager's Email Address</label>
+                                <input type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
+                            </div>
+                        </div>
+                        {error && <p className="text-sm text-red-600">{error}</p>}
+                        {success && <p className="text-sm text-emerald-600">{success}</p>}
+                        <div className="flex justify-end gap-4">
+                            <button type="button" onClick={() => onNavigate('platformAdminDashboard', { user })} className="bg-slate-200 text-slate-800 font-semibold py-2 px-6 rounded-lg hover:bg-slate-300">Cancel</button>
+                            <button type="submit" className="bg-emerald-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-emerald-700">Create</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </>
     );
