@@ -4,7 +4,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc, writeBatch } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getAuth, signInAnonymously, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 // Register Chart.js components
 ChartJS.register(
@@ -12,14 +12,14 @@ ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler
 );
 
-// Your web app's Firebase configuration for 'payroll-skills-v2'
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBqIX9G11_iJ844iy5D-B0kETfQB1gXCmQ",
+  apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
   authDomain: "payroll-skills-v2.firebaseapp.com",
   projectId: "payroll-skills-v2",
   storageBucket: "payroll-skills-v2.appspot.com",
   messagingSenderId: "910997146613",
-  appId: "1:910997146613:web:6cfcd685442b38c5972ebc"
+  appId: "1:910997146613:web:12c57176373976b71ecc6e"
 };
 
 // Initialize Firebase services
@@ -59,15 +59,13 @@ function App() {
                             setView('login');
                     }
                 } else {
-                    // This can happen briefly during sign up before the user doc is created
                     setView('login');
                 }
             } else {
-                // User is signed out
                 setUser(null);
                 setView('login');
             }
-            setAuthLoading(false); // Auth check is complete
+            setAuthLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -299,8 +297,8 @@ const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
         }
 
         try {
-            // In a real app, this would be a multi-step process, likely involving a Cloud Function
-            // to create the auth user and then the Firestore documents securely.
+            // This is a placeholder for a Cloud Function that would create the auth user
+            // and then the Firestore documents securely.
             console.log("Creating Organisation:", { orgName });
             console.log("Creating Manager:", { managerName, managerEmail, role: 'manager' });
             
