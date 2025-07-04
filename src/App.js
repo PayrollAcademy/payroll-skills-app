@@ -12,16 +12,15 @@ ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler
 );
 
-// Your web app's Firebase configuration
+// CORRECTED: Your web app's Firebase configuration for 'payroll-skills-v2'
 const firebaseConfig = {
   apiKey: "AIzaSyBqIX9G11_iJ844iy5D-B0kETfQB1gXCmQ",
   authDomain: "payroll-skills-v2.firebaseapp.com",
   projectId: "payroll-skills-v2",
-  storageBucket: "payroll-skills-v2.firebasestorage.app",
+  storageBucket: "payroll-skills-v2.appspot.com",
   messagingSenderId: "910997146613",
   appId: "1:910997146613:web:6cfcd685442b38c5972ebc"
 };
-
 
 // Initialize Firebase services
 const app = initializeApp(firebaseConfig);
@@ -32,20 +31,18 @@ const functions = getFunctions(app);
 // --- Main App Component ---
 function App() {
     const [view, setView] = useState('loading');
-    const [user, setUser] = useState(null); // Will hold user profile data from Firestore
+    const [user, setUser] = useState(null);
     const [appId] = useState('payroll-skills-app-v1');
     const [contextData, setContextData] = useState({});
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
-                // User is signed in, fetch their profile from Firestore
                 const userDocSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", firebaseUser.uid)));
                 
                 if (!userDocSnap.empty) {
                     const userProfile = { uid: firebaseUser.uid, ...userDocSnap.docs[0].data() };
                     setUser(userProfile);
-                    // Navigate to the correct dashboard based on role
                     switch (userProfile.role) {
                         case 'platformAdmin':
                             setView('platformAdminDashboard');
@@ -63,7 +60,6 @@ function App() {
                     setView('login');
                 }
             } else {
-                // User is signed out
                 setUser(null);
                 setView('login');
             }
@@ -74,7 +70,7 @@ function App() {
     const navigateTo = (newView, navData = {}) => {
         setView(newView);
         if (navData.user) setUser(navData.user);
-        if (navData.context) setContextData(navData.context);
+        setContextData(navData);
     };
 
     const handleSignOut = async () => {
@@ -88,9 +84,9 @@ function App() {
         if (view === 'error') return <div className="flex items-center justify-center min-h-screen text-red-500">An error occurred. Please refresh.</div>;
 
         if (!user && view !== 'login') {
-            return <LoginScreen onNavigate={navigateTo} />;
+             return <LoginScreen onNavigate={navigateTo} />;
         }
-        
+
         switch (view) {
             case 'login': return <LoginScreen onNavigate={navigateTo} />;
             case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} />;
@@ -160,7 +156,7 @@ const Shell = ({ user, children, onNavigate, onSignOut, currentView }) => {
 };
 
 // --- REAL LOGIN COMPONENT ---
-const LoginScreen = () => {
+const LoginScreen = ({ onNavigate }) => {
     const [isLoginView, setIsLoginView] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -174,6 +170,7 @@ const LoginScreen = () => {
         if (isLoginView) {
             try {
                 await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle navigation
             } catch (err) {
                 setError(err.message);
             }
@@ -184,12 +181,14 @@ const LoginScreen = () => {
             }
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                // Create user profile in Firestore
                 await setDoc(doc(db, "users", userCredential.user.uid), {
                     name: name,
                     email: email,
-                    role: "candidate", // Default role
+                    role: "candidate", // Default role for public sign-up
                     organisationId: "public"
                 });
+                // onAuthStateChanged will handle navigation
             } catch (err) {
                 setError(err.message);
             }
@@ -232,7 +231,6 @@ const LoginScreen = () => {
         </div>
     );
 };
-
 
 const PlatformAdminDashboard = ({ onNavigate, user, db }) => {
     const [organisations, setOrganisations] = useState([]);
