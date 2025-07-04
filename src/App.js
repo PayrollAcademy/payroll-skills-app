@@ -14,14 +14,14 @@ ChartJS.register(
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
-  authDomain: "payroll-skills-platform.firebaseapp.com",
-  projectId: "payroll-skills-platform",
-  storageBucket: "payroll-skills-platform.appspot.com",
-  messagingSenderId: "373583398443",
-  appId: "1:373583398443:web:12c57176373976b71ecc6e",
-  measurementId: "G-H0PKLLW5PM"
+  apiKey: "AIzaSyBqIX9G11_iJ844iy5D-B0kETfQB1gXCmQ",
+  authDomain: "payroll-skills-v2.firebaseapp.com",
+  projectId: "payroll-skills-v2",
+  storageBucket: "payroll-skills-v2.firebasestorage.app",
+  messagingSenderId: "910997146613",
+  appId: "1:910997146613:web:6cfcd685442b38c5972ebc"
 };
+
 
 // Initialize Firebase services
 const app = initializeApp(firebaseConfig);

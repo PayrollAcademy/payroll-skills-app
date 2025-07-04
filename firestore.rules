@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to get the requesting user's role from their profile
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Helper function to check if the user is a Platform Admin
+    function isPlatformAdmin() {
+      return getUserRole() == "platformAdmin";
+    }
+
+    // Helper function to check if the user is a Manager
+    function isManager() {
+      return getUserRole() == "manager";
+    }
+
+    // --- Security Rules for Each Collection ---
+
+    // Users can only read and update their own profile.
+    match /users/{userId} {
+      allow read, update: if request.auth.uid == userId || isPlatformAdmin();
+      // Any authenticated user can create their own user profile document
+      allow create: if request.auth.uid == userId;
+    }
+
+    // Only Platform Admins can create, read, or change organisations.
+    match /organisations/{orgId} {
+      allow read, write: if isPlatformAdmin();
+    }
+
+    // --- Rules for the main application data ---
+    match /artifacts/{appId}/public/data/{document=**} {
+      // Managers and Platform Admins can manage the question bank and tests
+      allow write: if isManager() || isPlatformAdmin();
+      // Any authenticated user (including candidates) can read questions and tests
+      allow read: if request.auth != null;
+    }
+
+    // Rules for test results
+    match /artifacts/{appId}/public/data/results/{resultId} {
+      // A user can create their own test result
+      allow create: if request.auth.uid == request.resource.data.userId;
+      // Managers and Platform Admins can read all results
+      // Candidates can read their own results ONLY if they have been shared
+      allow read: if isManager() || isPlatformAdmin() || (request.auth.uid == resource.data.userId && resource.data.isShared == true);
+      // Only managers and platform admins can update (e.g., add feedback) or delete results
+      allow update, delete: if isManager() || isPlatformAdmin();
+    }
+  }
+}
