@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Bar, Radar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc, writeBatch } from "firebase/firestore";
+import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
@@ -14,7 +14,7 @@ ChartJS.register(
 
 // Your web app's Firebase configuration for 'payroll-skills-v2'
 const firebaseConfig = {
-  apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
+  apiKey: "AIzaSyBqIX9G11_iJ844iy5D-B0kETfQB1gXCmQ",
   authDomain: "payroll-skills-v2.firebaseapp.com",
   projectId: "payroll-skills-v2",
   storageBucket: "payroll-skills-v2.appspot.com",
@@ -39,10 +39,12 @@ function App() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
-                const userDocSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", firebaseUser.uid)));
+                // This is the user's excellent fix - fetching the doc directly by ID
+                const userDocRef = doc(db, "users", firebaseUser.uid);
+                const userDocSnap = await getDoc(userDocRef);
                 
-                if (!userDocSnap.empty) {
-                    const userProfile = { uid: firebaseUser.uid, ...userDocSnap.docs[0].data() };
+                if (userDocSnap.exists()) {
+                    const userProfile = { uid: firebaseUser.uid, ...userDocSnap.data() };
                     setUser(userProfile);
                     // Navigate to the correct dashboard based on role
                     switch (userProfile.role) {
@@ -59,15 +61,13 @@ function App() {
                             setView('login');
                     }
                 } else {
-                    // This can happen briefly during sign up before the user doc is created
                     setView('login');
                 }
             } else {
-                // User is signed out
                 setUser(null);
                 setView('login');
             }
-            setAuthLoading(false); // Auth check is complete
+            setAuthLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -80,7 +80,6 @@ function App() {
 
     const handleSignOut = async () => {
         await signOut(auth);
-        // onAuthStateChanged will handle setting user to null and view to 'login'
     };
 
     const renderContent = () => {
@@ -91,7 +90,7 @@ function App() {
         if (!user) {
             return <LoginScreen onNavigate={navigateTo} />;
         }
-        
+
         switch (view) {
             case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} />;
             case 'platformAdminCreateOrg': return <CreateOrganisationScreen user={user} db={db} onNavigate={navigateTo} />;
@@ -109,8 +108,7 @@ function App() {
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
-            {authLoading ? <div className="flex items-center justify-center min-h-screen text-slate-500">Authenticating...</div> : 
-             !user ? <LoginScreen onNavigate={navigateTo} /> : (
+            {authLoading || !user ? <LoginScreen onNavigate={navigateTo} /> : (
                 <Shell user={user} onNavigate={navigateTo} onSignOut={handleSignOut} currentView={view}>
                     {renderContent()}
                 </Shell>
