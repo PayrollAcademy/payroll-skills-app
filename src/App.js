@@ -12,9 +12,9 @@ ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler
 );
 
-// CORRECTED: Your web app's Firebase configuration for 'payroll-skills-v2'
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBqIX9G11_iJ844iy5D-B0kETfQB1gXCmQ",
+  apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
   authDomain: "payroll-skills-v2.firebaseapp.com",
   projectId: "payroll-skills-v2",
   storageBucket: "payroll-skills-v2.appspot.com",
@@ -31,18 +31,21 @@ const functions = getFunctions(app);
 // --- Main App Component ---
 function App() {
     const [view, setView] = useState('loading');
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(null); // Will hold user profile data from Firestore
     const [appId] = useState('payroll-skills-app-v1');
     const [contextData, setContextData] = useState({});
+    const [authLoading, setAuthLoading] = useState(true);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
+                const userDocRef = doc(db, "users", firebaseUser.uid);
                 const userDocSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", firebaseUser.uid)));
                 
                 if (!userDocSnap.empty) {
                     const userProfile = { uid: firebaseUser.uid, ...userDocSnap.docs[0].data() };
                     setUser(userProfile);
+                    // Navigate to the correct dashboard based on role
                     switch (userProfile.role) {
                         case 'platformAdmin':
                             setView('platformAdminDashboard');
@@ -57,12 +60,16 @@ function App() {
                             setView('login');
                     }
                 } else {
+                    // This can happen briefly during sign up before the user doc is created
+                    // We'll stay on the login/signup page in this case.
                     setView('login');
                 }
             } else {
+                // User is signed out
                 setUser(null);
                 setView('login');
             }
+            setAuthLoading(false); // Auth check is complete
         });
         return () => unsubscribe();
     }, []);
@@ -70,7 +77,7 @@ function App() {
     const navigateTo = (newView, navData = {}) => {
         setView(newView);
         if (navData.user) setUser(navData.user);
-        setContextData(navData);
+        if (navData.context) setContextData(navData.context);
     };
 
     const handleSignOut = async () => {
@@ -80,15 +87,15 @@ function App() {
     };
 
     const renderContent = () => {
-        if (view === 'loading') return <div className="flex items-center justify-center min-h-screen text-slate-500">Loading Platform...</div>;
-        if (view === 'error') return <div className="flex items-center justify-center min-h-screen text-red-500">An error occurred. Please refresh.</div>;
+        if (authLoading) {
+            return <div className="flex items-center justify-center min-h-screen text-slate-500">Authenticating...</div>;
+        }
 
-        if (!user && view !== 'login') {
-             return <LoginScreen onNavigate={navigateTo} />;
+        if (!user) {
+            return <LoginScreen onNavigate={navigateTo} />;
         }
 
         switch (view) {
-            case 'login': return <LoginScreen onNavigate={navigateTo} />;
             case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} />;
             case 'platformAdminCreateOrg': return <CreateOrganisationScreen user={user} db={db} onNavigate={navigateTo} />;
             case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} db={db} appId={appId} />;
@@ -105,7 +112,7 @@ function App() {
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
-            {view === 'login' || view === 'loading' || view === 'error' || !user ? <LoginScreen onNavigate={navigateTo} /> : (
+             {view === 'login' || authLoading ? renderContent() : (
                 <Shell user={user} onNavigate={navigateTo} onSignOut={handleSignOut} currentView={view}>
                     {renderContent()}
                 </Shell>
@@ -231,6 +238,7 @@ const LoginScreen = ({ onNavigate }) => {
         </div>
     );
 };
+
 
 const PlatformAdminDashboard = ({ onNavigate, user, db }) => {
     const [organisations, setOrganisations] = useState([]);
