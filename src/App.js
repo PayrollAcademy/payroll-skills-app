@@ -14,7 +14,7 @@ ChartJS.register(
 
 // Your web app's Firebase configuration for 'payroll-skills-v2'
 const firebaseConfig = {
-  apiKey: "AIzaSyBqIX9G11_iJ844iy5D-B0kETfQB1gXCmQ",
+  apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
   authDomain: "payroll-skills-v2.firebaseapp.com",
   projectId: "payroll-skills-v2",
   storageBucket: "payroll-skills-v2.appspot.com",
@@ -30,11 +30,11 @@ const functions = getFunctions(app);
 
 // --- Main App Component ---
 function App() {
-    const [authStatus, setAuthStatus] = useState('loading'); // 'loading', 'authenticated', 'unauthenticated'
+    const [view, setView] = useState('loading');
     const [user, setUser] = useState(null); // Will hold user profile data from Firestore
-    const [view, setView] = useState('login');
     const [appId] = useState('payroll-skills-app-v1');
     const [contextData, setContextData] = useState({});
+    const [authLoading, setAuthLoading] = useState(true);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -44,7 +44,6 @@ function App() {
                 if (!userDocSnap.empty) {
                     const userProfile = { uid: firebaseUser.uid, ...userDocSnap.docs[0].data() };
                     setUser(userProfile);
-                    setAuthStatus('authenticated');
                     // Navigate to the correct dashboard based on role
                     switch (userProfile.role) {
                         case 'platformAdmin':
@@ -61,16 +60,14 @@ function App() {
                     }
                 } else {
                     // This can happen briefly during sign up before the user doc is created
-                    // We'll stay on the login/signup page in this case.
-                    setAuthStatus('unauthenticated');
                     setView('login');
                 }
             } else {
                 // User is signed out
                 setUser(null);
-                setAuthStatus('unauthenticated');
                 setView('login');
             }
+            setAuthLoading(false); // Auth check is complete
         });
         return () => unsubscribe();
     }, []);
@@ -87,23 +84,14 @@ function App() {
     };
 
     const renderContent = () => {
-        if (authStatus === 'loading') {
+        if (authLoading) {
             return <div className="flex items-center justify-center min-h-screen text-slate-500">Authenticating...</div>;
         }
 
-        if (authStatus === 'unauthenticated') {
+        if (!user) {
             return <LoginScreen onNavigate={navigateTo} />;
         }
         
-        // If authenticated, render the shell and the correct view
-        return (
-            <Shell user={user} onNavigate={navigateTo} onSignOut={handleSignOut} currentView={view}>
-                {renderCurrentView()}
-            </Shell>
-        );
-    };
-    
-    const renderCurrentView = () => {
         switch (view) {
             case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} />;
             case 'platformAdminCreateOrg': return <CreateOrganisationScreen user={user} db={db} onNavigate={navigateTo} />;
@@ -115,13 +103,18 @@ function App() {
             case 'candidateDashboard': return <CandidateWelcome user={user} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'candidateTestInProgress': return <TestInProgress user={user} testId={contextData.testId} db={db} appId={appId} onNavigate={navigateTo} />;
             case 'testFinished': return <TestFinishedScreen user={user} onNavigate={navigateTo} />;
-            default: return <div className="text-center p-8">Welcome! Please select a page from the sidebar.</div>;
+            default: return <LoginScreen onNavigate={navigateTo} />;
         }
     };
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
-            {renderContent()}
+            {authLoading ? <div className="flex items-center justify-center min-h-screen text-slate-500">Authenticating...</div> : 
+             !user ? <LoginScreen onNavigate={navigateTo} /> : (
+                <Shell user={user} onNavigate={navigateTo} onSignOut={handleSignOut} currentView={view}>
+                    {renderContent()}
+                </Shell>
+            )}
         </div>
     );
 }
