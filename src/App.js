@@ -19,7 +19,7 @@ const firebaseConfig = {
   projectId: "payroll-skills-v2",
   storageBucket: "payroll-skills-v2.appspot.com",
   messagingSenderId: "910997146613",
-  appId: "1:910997146613:web:6cfcd685442b38c5972ebc"
+  appId: "1:910997146613:web:12c57176373976b71ecc6e"
 };
 
 // Initialize Firebase services
@@ -36,10 +36,9 @@ function App() {
     const [contextData, setContextData] = useState({});
 
     useEffect(() => {
-        // Sign in anonymously to allow backend function calls, but don't control UI flow.
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
             if (!firebaseUser) {
-                signInAnonymously(auth).catch((error) => { console.error("Anonymous sign-in error:", error); });
+                 signInAnonymously(auth).catch((error) => { console.error("Anonymous sign-in error:", error); });
             }
         });
         return () => unsubscribe();
@@ -69,11 +68,11 @@ function App() {
             case 'orgAdminDashboard': componentToRender = <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
             case 'orgAdminQuestionBank': componentToRender = <QuestionBank user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
             case 'orgAdminBulkImport': return <BulkImportScreen user={user} db={db} appId={appId} onNavigate={navigateTo} />;
-            case 'orgAdminTestBuilder': return <TestBuilder user={user} db={db} appId={appId} onNavigate={navigateTo} />;
-            case 'orgAdminReportDetail': return <ReportAndFeedback user={user} result={contextData.result} db={db} appId={appId} onNavigate={navigateTo} />;
-            case 'candidateDashboard': return <CandidateWelcome user={user} db={db} appId={appId} onNavigate={navigateTo} />;
-            case 'candidateTestInProgress': return <TestInProgress user={user} testId={contextData.testId} db={db} appId={appId} onNavigate={navigateTo} />;
-            case 'testFinished': return <TestFinishedScreen user={user} onNavigate={navigateTo} />;
+            case 'orgAdminTestBuilder': return <TestBuilder user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
+            case 'orgAdminReportDetail': return <ReportAndFeedback user={user} result={contextData.result} db={db} appId={appId} onNavigate={navigateTo} />; break;
+            case 'candidateDashboard': return <CandidateWelcome user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
+            case 'candidateTestInProgress': return <TestInProgress user={user} testId={contextData.testId} db={db} appId={appId} onNavigate={navigateTo} />; break;
+            case 'testFinished': return <TestFinishedScreen user={user} onNavigate={navigateTo} />; break;
             default: componentToRender = <LoginScreen onNavigate={navigateTo} />;
         }
         
@@ -131,8 +130,6 @@ const Shell = ({ user, children, onNavigate, onSignOut, currentView }) => {
         </div>
     );
 };
-
-// --- Component Views ---
 
 const LoginScreen = ({ onNavigate }) => {
     const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
@@ -774,6 +771,7 @@ const BulkImportScreen = ({ user, db, appId, onNavigate }) => {
 
             const batch = writeBatch(db);
             let count = 0;
+            const errors = [];
             lines.forEach((line, index) => {
                 const data = line.split(',');
                 if (data.length === 8) {
@@ -784,20 +782,30 @@ const BulkImportScreen = ({ user, db, appId, onNavigate }) => {
                         topic: data[6].trim(),
                         difficulty: data[7].trim(),
                     };
-                    const newQuestionRef = doc(collection(db, `/artifacts/${appId}/public/data/question_bank`));
-                    batch.set(newQuestionRef, questionData);
-                    count++;
+                    if (!questionData.options.includes(questionData.answer)) {
+                        errors.push(`Line ${index + 2}: The correct answer is not one of the provided options.`);
+                    } else {
+                        const newQuestionRef = doc(collection(db, `/artifacts/${appId}/public/data/question_bank`));
+                        batch.set(newQuestionRef, questionData);
+                        count++;
+                    }
                 } else {
-                    console.warn(`Skipping line ${index + 2}: incorrect number of columns.`);
+                    errors.push(`Skipping line ${index + 2}: incorrect number of columns. Expected 8, found ${data.length}.`);
                 }
             });
+
+            if (errors.length > 0) {
+                setUploadStatus(`Upload failed with ${errors.length} errors. Please fix your CSV file. Errors: ${errors.join('; ')}`);
+                setIsUploading(false);
+                return;
+            }
 
             try {
                 await batch.commit();
                 setUploadStatus(`${count} questions uploaded successfully!`);
                 setCsvFile(null);
             } catch (err) {
-                setUploadStatus('Error uploading questions.');
+                setUploadStatus('Error uploading questions to the database.');
                 console.error(err);
             }
             setIsUploading(false);
