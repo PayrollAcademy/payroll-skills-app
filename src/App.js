@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Bar, Radar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler } from 'chart.js';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, doc, setDoc, updateDoc, where, deleteDoc, writeBatch } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Register Chart.js components
 ChartJS.register(
@@ -12,14 +12,14 @@ ChartJS.register(
   RadialLinearScale, PointElement, LineElement, Filler
 );
 
-// Your web app's Firebase configuration for 'payroll-skills-v2'
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBqIX9G11_iJ844iy5D-B0kETfQB1gXCmQ",
+  apiKey: "AIzaSyAbUuCsFVSNA7ijESCAG9TFofQOFmVmWOU",
   authDomain: "payroll-skills-v2.firebaseapp.com",
   projectId: "payroll-skills-v2",
   storageBucket: "payroll-skills-v2.appspot.com",
   messagingSenderId: "910997146613",
-  appId: "1:910997146613:web:6cfcd685442b38c5972ebc"
+  appId: "1:910997146613:web:12c57176373976b71ecc6e"
 };
 
 // Initialize Firebase services
@@ -30,44 +30,22 @@ const functions = getFunctions(app);
 
 // --- Main App Component ---
 function App() {
-    const [view, setView] = useState('loading');
-    const [user, setUser] = useState(null); // Will hold user profile data from Firestore
+    const [view, setView] = useState('login');
+    const [user, setUser] = useState(null);
     const [appId] = useState('payroll-skills-app-v1');
     const [contextData, setContextData] = useState({});
-    const [authLoading, setAuthLoading] = useState(true);
 
+    // This useEffect hook is for the *real* auth system, which we are temporarily bypassing
+    // to use the mock login buttons. It will be re-enabled later.
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
             if (firebaseUser) {
-                // This is the user's excellent fix - fetching the doc directly by ID
-                const userDocRef = doc(db, "users", firebaseUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                
-                if (userDocSnap.exists()) {
-                    const userProfile = { uid: firebaseUser.uid, ...userDocSnap.data() };
-                    setUser(userProfile);
-                    // Navigate to the correct dashboard based on role
-                    switch (userProfile.role) {
-                        case 'platformAdmin':
-                            setView('platformAdminDashboard');
-                            break;
-                        case 'manager':
-                            setView('orgAdminDashboard');
-                            break;
-                        case 'candidate':
-                            setView('candidateDashboard');
-                            break;
-                        default:
-                            setView('login');
-                    }
-                } else {
-                    setView('login');
-                }
+                // In a real system, we'd fetch the user profile here.
+                // For now, we do nothing to let the mock login work.
             } else {
-                setUser(null);
-                setView('login');
+                // If no one is logged in, we can sign in anonymously for backend access
+                signInAnonymously(auth).catch((error) => { console.error("Anonymous sign-in error:", error); });
             }
-            setAuthLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -78,20 +56,14 @@ function App() {
         if (navData.context) setContextData(navData.context);
     };
 
-    const handleSignOut = async () => {
-        await signOut(auth);
+    const handleSignOut = () => {
+        setUser(null);
+        setView('login');
     };
 
     const renderContent = () => {
-        if (authLoading) {
-            return <div className="flex items-center justify-center min-h-screen text-slate-500">Authenticating...</div>;
-        }
-
-        if (!user) {
-            return <LoginScreen onNavigate={navigateTo} />;
-        }
-
         switch (view) {
+            case 'login': return <LoginScreen onNavigate={navigateTo} />;
             case 'platformAdminDashboard': return <PlatformAdminDashboard onNavigate={navigateTo} user={user} db={db} />;
             case 'platformAdminCreateOrg': return <CreateOrganisationScreen user={user} db={db} onNavigate={navigateTo} />;
             case 'orgAdminTeamSkills': return <TeamSkillsDashboard user={user} db={db} appId={appId} />;
@@ -108,7 +80,7 @@ function App() {
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
-            {authLoading || !user ? <LoginScreen onNavigate={navigateTo} /> : (
+             {view === 'login' || !user ? <LoginScreen onNavigate={navigateTo} /> : (
                 <Shell user={user} onNavigate={navigateTo} onSignOut={handleSignOut} currentView={view}>
                     {renderContent()}
                 </Shell>
@@ -150,7 +122,7 @@ const Shell = ({ user, children, onNavigate, onSignOut, currentView }) => {
                             </a>
                         ))}
                     </nav>
-                     <div className="p-4 absolute bottom-0 w-64"><div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/75"><div className="flex items-center"><img className="h-10 w-10 rounded-full" src={`https://placehold.co/100x100?text=${user.name.charAt(0)}`} alt={user.name}/><div className="ml-3"><p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p><p className="text-xs text-slate-500 dark:text-slate-400">{user.role}</p></div></div><a href="#" onClick={onSignOut} className="w-full text-center mt-3 text-xs text-slate-500 hover:text-sky-500">Sign Out</a></div></div>
+                     <div className="p-4 absolute bottom-0 w-64"><div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/75"><div className="flex items-center"><img className="h-10 w-10 rounded-full" src={user.avatar} alt={user.name}/><div className="ml-3"><p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p><p className="text-xs text-slate-500 dark:text-slate-400">{user.company}</p></div></div><a href="#" onClick={onSignOut} className="w-full text-center mt-3 text-xs text-slate-500 hover:text-sky-500">Sign Out</a></div></div>
                 </aside>
             )}
             <main className="flex-1 overflow-y-auto"><div className={showSidebar ? "p-6 md:p-8" : "p-2 sm:p-4 md:p-8"}>{children}</div></main>
@@ -158,77 +130,20 @@ const Shell = ({ user, children, onNavigate, onSignOut, currentView }) => {
     );
 };
 
-// --- REAL LOGIN COMPONENT ---
+// --- MOCK LOGIN COMPONENT ---
 const LoginScreen = ({ onNavigate }) => {
-    const [isLoginView, setIsLoginView] = useState(true);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
-    const [error, setError] = useState('');
-
-    const handleAuthAction = async (e) => {
-        e.preventDefault();
-        setError('');
-
-        if (isLoginView) {
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged will handle navigation
-            } catch (err) {
-                setError(err.message);
-            }
-        } else {
-            if (!name) {
-                setError("Please enter your name.");
-                return;
-            }
-            try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                // Create user profile in Firestore
-                await setDoc(doc(db, "users", userCredential.user.uid), {
-                    name: name,
-                    email: email,
-                    role: "candidate", // Default role for public sign-up
-                    organisationId: "public"
-                });
-                // onAuthStateChanged will handle navigation
-            } catch (err) {
-                setError(err.message);
-            }
-        }
-    };
+    const orgAdminUser = { name: 'Payroll Manager', role: 'orgAdmin', company: 'ABC Corp', avatar: 'https://placehold.co/100x100/a3e635/14532d?text=A' };
+    const candidateUser = { name: 'Liam Gallagher', role: 'candidate', company: 'Candidate', avatar: 'https://placehold.co/100x100/60a5fa/1e3a8a?text=L' };
+    const platformAdminUser = { name: 'Platform Admin', role: 'platformAdmin', company: 'Payroll Platform', avatar: 'https://placehold.co/100x100/fde047/78350f?text=P' };
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900">
-            <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-slate-800 rounded-2xl shadow-lg">
-                <div className="text-center">
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Payroll Skills Platform</h1>
-                    <p className="mt-2 text-slate-500 dark:text-slate-400">{isLoginView ? "Sign in to your account" : "Create a new account"}</p>
-                </div>
-                <form onSubmit={handleAuthAction} className="space-y-4">
-                    {!isLoginView && (
-                        <div>
-                            <label className="block text-sm font-medium">Full Name</label>
-                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
-                        </div>
-                    )}
-                    <div>
-                        <label className="block text-sm font-medium">Email Address</label>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">Password</label>
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md" required />
-                    </div>
-                    {error && <p className="text-sm text-red-600">{error}</p>}
-                    <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700">
-                        {isLoginView ? 'Sign In' : 'Sign Up'}
-                    </button>
-                </form>
-                <div className="text-center">
-                    <button onClick={() => setIsLoginView(!isLoginView)} className="text-sm text-sky-600 hover:underline">
-                        {isLoginView ? "Need an account? Sign Up" : "Already have an account? Sign In"}
-                    </button>
+            <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-slate-800 rounded-2xl shadow-lg">
+                <div className="text-center"><h1 className="text-3xl font-bold text-slate-900 dark:text-white">Payroll Skills Platform</h1><p className="mt-2 text-slate-500 dark:text-slate-400">Welcome back! Please sign in.</p></div>
+                <div className="space-y-4">
+                    <button onClick={() => onNavigate('orgAdminDashboard', { user: orgAdminUser })} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700">Sign in as Payroll Manager</button>
+                    <button onClick={() => onNavigate('candidateDashboard', { user: candidateUser })} className="w-full flex justify-center py-3 px-4 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">Sign in as Candidate</button>
+                    <button onClick={() => onNavigate('platformAdminDashboard', { user: platformAdminUser })} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-slate-500 hover:text-slate-700">Platform Admin</button>
                 </div>
             </div>
         </div>
@@ -297,8 +212,6 @@ const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
         }
 
         try {
-            // This is a placeholder for a Cloud Function that would create the auth user
-            // and then the Firestore documents securely.
             console.log("Creating Organisation:", { orgName });
             console.log("Creating Manager:", { managerName, managerEmail, role: 'manager' });
             
@@ -307,7 +220,6 @@ const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
                 createdAt: new Date()
             });
 
-            // Placeholder UID creation. In a real app, this UID would come from creating an auth user.
             const managerUid = `manager_${Date.now()}`; 
             await setDoc(doc(db, "users", managerUid), {
                 name: managerName,
