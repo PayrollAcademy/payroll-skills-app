@@ -36,7 +36,7 @@ function App() {
     const [contextData, setContextData] = useState({});
 
     useEffect(() => {
-        // Sign in anonymously to allow backend function calls, but don't control UI flow
+        // Sign in anonymously to allow backend function calls, but don't control UI flow.
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
             if (!firebaseUser) {
                 signInAnonymously(auth).catch((error) => { console.error("Anonymous sign-in error:", error); });
@@ -68,12 +68,12 @@ function App() {
             case 'orgAdminTeamSkills': componentToRender = <TeamSkillsDashboard user={user} db={db} appId={appId} />; break;
             case 'orgAdminDashboard': componentToRender = <CandidateDashboard user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
             case 'orgAdminQuestionBank': componentToRender = <QuestionBank user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
-            case 'orgAdminBulkImport': componentToRender = <BulkImportScreen user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
-            case 'orgAdminTestBuilder': componentToRender = <TestBuilder user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
-            case 'orgAdminReportDetail': componentToRender = <ReportAndFeedback user={user} result={contextData.result} db={db} appId={appId} onNavigate={navigateTo} />; break;
-            case 'candidateDashboard': componentToRender = <CandidateWelcome user={user} db={db} appId={appId} onNavigate={navigateTo} />; break;
-            case 'candidateTestInProgress': componentToRender = <TestInProgress user={user} testId={contextData.testId} db={db} appId={appId} onNavigate={navigateTo} />; break;
-            case 'testFinished': componentToRender = <TestFinishedScreen user={user} onNavigate={navigateTo} />; break;
+            case 'orgAdminBulkImport': return <BulkImportScreen user={user} db={db} appId={appId} onNavigate={navigateTo} />;
+            case 'orgAdminTestBuilder': return <TestBuilder user={user} db={db} appId={appId} onNavigate={navigateTo} />;
+            case 'orgAdminReportDetail': return <ReportAndFeedback user={user} result={contextData.result} db={db} appId={appId} onNavigate={navigateTo} />;
+            case 'candidateDashboard': return <CandidateWelcome user={user} db={db} appId={appId} onNavigate={navigateTo} />;
+            case 'candidateTestInProgress': return <TestInProgress user={user} testId={contextData.testId} db={db} appId={appId} onNavigate={navigateTo} />;
+            case 'testFinished': return <TestFinishedScreen user={user} onNavigate={navigateTo} />;
             default: componentToRender = <LoginScreen onNavigate={navigateTo} />;
         }
         
@@ -236,7 +236,6 @@ const CreateOrganisationScreen = ({ user, db, onNavigate }) => {
                 createdAt: new Date()
             });
 
-            // Placeholder UID creation. In a real app, this UID would come from creating an auth user.
             const managerUid = `manager_${Date.now()}`; 
             await setDoc(doc(db, "users", managerUid), {
                 name: managerName,
