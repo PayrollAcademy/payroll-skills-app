@@ -135,6 +135,7 @@ const Shell = ({ user, children, onNavigate, onSignOut, currentView }) => {
     };
     const navigationLinks = user && user.role ? navs[user.role] : [];
     const showSidebar = currentView !== 'candidateTestInProgress';
+    const initial = user?.name ? user.name.charAt(0) : "?";
 
     return (
         <div className="flex h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
@@ -150,7 +151,22 @@ const Shell = ({ user, children, onNavigate, onSignOut, currentView }) => {
                             </a>
                         ))}
                     </nav>
-                     <div className="p-4 absolute bottom-0 w-64"><div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/75"><div className="flex items-center"><img className="h-10 w-10 rounded-full" src={`https://placehold.co/100x100?text=${user.name.charAt(0)}`} alt={user.name}/><div className="ml-3"><p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p><p className="text-xs text-slate-500 dark:text-slate-400">{user.role}</p></div></div><a href="#" onClick={onSignOut} className="w-full text-center mt-3 text-xs text-slate-500 hover:text-sky-500">Sign Out</a></div></div>
+                     <div className="p-4 absolute bottom-0 w-64">
+                         <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/75">
+                             <div className="flex items-center">
+                                 <img
+                                     className="h-10 w-10 rounded-full"
+                                     src={`https://placehold.co/100x100?text=${initial}`}
+                                     alt={user?.name ?? "User"}
+                                 />
+                                 <div className="ml-3">
+                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{user?.name ?? 'Unknown User'}</p>
+                                     <p className="text-xs text-slate-500 dark:text-slate-400">{user?.role}</p>
+                                 </div>
+                             </div>
+                             <a href="#" onClick={onSignOut} className="w-full text-center mt-3 text-xs text-slate-500 hover:text-sky-500">Sign Out</a>
+                         </div>
+                     </div>
                 </aside>
             )}
             <main className="flex-1 overflow-y-auto"><div className={showSidebar ? "p-6 md:p-8" : "p-2 sm:p-4 md:p-8"}>{children}</div></main>
@@ -1040,20 +1056,29 @@ const CandidateWelcome = ({ user, db, appId, onNavigate }) => {
             setTests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
 
-        const fetchResults = onSnapshot(query(collection(db, `/artifacts/${appId}/public/data/results`), where("userName", "==", user.name), where("isShared", "==", true)), (snapshot) => {
+        const fetchResults = onSnapshot(
+            query(
+                collection(db, `/artifacts/${appId}/public/data/results`),
+                where("userName", "==", user?.name ?? ""),
+                where("isShared", "==", true)
+            ),
+            (snapshot) => {
             setResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
+            }
+        );
 
         setLoading(false);
         return () => {
             fetchTests();
             fetchResults();
         };
-    }, [db, appId, user.name]);
+    }, [db, appId, user?.name]);
 
     return (
         <>
-            <header className="mb-8"><h2 className="text-3xl font-bold">Welcome, {user.name.split(' ')[0]}!</h2></header>
+            <header className="mb-8">
+                <h2 className="text-3xl font-bold">Welcome, {user?.name ? user.name.split(' ')[0] : 'User'}!</h2>
+            </header>
             <div className="bg-white dark:bg-slate-800/75 p-6 rounded-lg border border-slate-200 dark:border-slate-700 mb-8">
                 <h3 className="text-lg font-semibold mb-4">Available Tests</h3>
                 {loading ? <p>Loading tests...</p> : (
@@ -1139,13 +1164,17 @@ const TestInProgress = ({ user, testId, db, appId, onNavigate }) => {
         }
 
         const resultData = {
-            userId: auth.currentUser.uid, userName: user.name, score, totalQuestions: questions.length,
+            userId: auth.currentUser.uid,
+            userName: user?.name ?? "",
+            score,
+            totalQuestions: questions.length,
             percentage: Math.round((score / questions.length) * 100), answers: finalAnswers, timestamp: new Date().toISOString(),
             topicScores: finalTopicScores, isShared: false,
         };
 
         try {
-            const resultId = `${user.name.replace(/\s+/g, '-')}-${Date.now()}`;
+            const sanitizedUserName = user?.name ? user.name.replace(/\s+/g, '-') : 'user';
+            const resultId = `${sanitizedUserName}-${Date.now()}`;
             await setDoc(doc(db, `/artifacts/${appId}/public/data/results`, resultId), resultData);
             onNavigate('testFinished', { user });
         } catch (error) {
